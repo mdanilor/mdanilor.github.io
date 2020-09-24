@@ -3,17 +3,62 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   
   <url>
-    <loc>https://mdanilor.github.io/</loc>
-    <lastmod>2020-04-28T18:01:34-03:00</lastmod>
+    <loc>https://mdanilor.github.io/tags/binary/</loc>
+    <lastmod>2020-09-24T18:01:34-03:00</lastmod>
   </url>
   
   <url>
-    <loc>https://mdanilor.github.io/tags/exploit/</loc>
-    <lastmod>2020-04-28T18:01:34-03:00</lastmod>
+    <loc>https://mdanilor.github.io/tags/buffer/</loc>
+    <lastmod>2020-09-24T18:01:34-03:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://mdanilor.github.io/</loc>
+    <lastmod>2020-09-24T18:01:34-03:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://mdanilor.github.io/posts/oscp-bof/</loc>
+    <lastmod>2020-09-24T18:01:34-03:00</lastmod>
   </url>
   
   <url>
     <loc>https://mdanilor.github.io/tags/exploitation/</loc>
+    <lastmod>2020-09-24T18:01:34-03:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://mdanilor.github.io/tags/oscp/</loc>
+    <lastmod>2020-09-24T18:01:34-03:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://mdanilor.github.io/tags/overflow/</loc>
+    <lastmod>2020-09-24T18:01:34-03:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://mdanilor.github.io/posts/</loc>
+    <lastmod>2020-09-24T18:01:34-03:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://mdanilor.github.io/tags/</loc>
+    <lastmod>2020-09-24T18:01:34-03:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://mdanilor.github.io/tags/tryhackme/</loc>
+    <lastmod>2020-09-24T18:01:34-03:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://mdanilor.github.io/tags/writeup/</loc>
+    <lastmod>2020-09-24T18:01:34-03:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://mdanilor.github.io/tags/exploit/</loc>
     <lastmod>2020-04-28T18:01:34-03:00</lastmod>
   </url>
   
@@ -33,52 +78,13 @@
   </url>
   
   <url>
-    <loc>https://mdanilor.github.io/tags/overflow/</loc>
-    <lastmod>2020-04-28T18:01:34-03:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://mdanilor.github.io/posts/</loc>
-    <lastmod>2020-04-28T18:01:34-03:00</lastmod>
-  </url>
-  
-  <url>
     <loc>https://mdanilor.github.io/tags/stack/</loc>
-    <lastmod>2020-04-28T18:01:34-03:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://mdanilor.github.io/tags/</loc>
     <lastmod>2020-04-28T18:01:34-03:00</lastmod>
   </url>
   
   <url>
     <loc>https://mdanilor.github.io/about-hugo/</loc>
     <lastmod>2014-04-09T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://mdanilor.github.io/tags/binary/</loc>
-  </url>
-  
-  <url>
-    <loc>https://mdanilor.github.io/tags/buffer/</loc>
-  </url>
-  
-  <url>
-    <loc>https://mdanilor.github.io/posts/oscp-bof/</loc>
-  </url>
-  
-  <url>
-    <loc>https://mdanilor.github.io/tags/oscp/</loc>
-  </url>
-  
-  <url>
-    <loc>https://mdanilor.github.io/tags/tryhackme/</loc>
-  </url>
-  
-  <url>
-    <loc>https://mdanilor.github.io/tags/writeup/</loc>
   </url>
   
 </urlset>

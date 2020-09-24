@@ -7,6 +7,7 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
+    <lastBuildDate>Thu, 24 Sep 2020 18:01:34 -0300</lastBuildDate>
     
 	<atom:link href="https://mdanilor.github.io/tags/buffer/index.xml" rel="self" type="application/rss+xml" />
     
@@ -14,7 +15,7 @@
     <item>
       <title>Cracking an OSCP-like buffer overflow</title>
       <link>https://mdanilor.github.io/posts/oscp-bof/</link>
-      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <pubDate>Thu, 24 Sep 2020 18:01:34 -0300</pubDate>
       
       <guid>https://mdanilor.github.io/posts/oscp-bof/</guid>
       <description>So my OSCP PWK lab starts next saturday. Throughout the last few months, I&amp;rsquo;ve been slowly preparing myself to start the lab. Solved dozens of CTF VMs on vulnhub and tryhackme. One VM that particularly caught my attention is hosted on TryHackMe, a brilliant platform for security enthusiasts and professionals to practice their skills. This VM is Buffer Overflow Prep, which, according to friends who have taken the exam, it&amp;rsquo;s pretty close to the OSCP exam BoF machine.</description>
