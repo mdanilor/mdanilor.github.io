@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en-us">
   <head>
-  <meta name="generator" content="Hugo 0.69.2" />
+  <meta name="generator" content="Hugo 0.73.0" />
 
 
 
@@ -396,7 +396,7 @@ Breakpoint 5, prepare_kernel_cred (daemon=0x0 &lt;fixed_percpu_data&gt;) at kern
 <p>Every thread in Linux has information stored in a struct named task_struct. According to Linux&rsquo;s own documentation, task_struct holds a pointer to another struct named creds:</p>
 <p><code>In Linux, all of a task’s credentials are held in (uid, gid) or through (groups, keys, LSM security) a refcounted structure of type ‘struct cred’. Each task points to its credentials by a pointer called ‘cred’ in its task_struct.</code></p>
 <p>(<a href="https://www.kernel.org/doc/html/v4.14/security/credentials.html#types-of-credentials">https://www.kernel.org/doc/html/v4.14/security/credentials.html#types-of-credentials</a>)</p>
-<p>In fact, if one executes a <code>ptype struct thread_struct</code> on GDB, the attribute is found:</p>
+<p>In fact, if one executes a <code>ptype struct task_struct</code> on GDB, the attribute is found:</p>
 <pre><code>(gdb) ptype struct task_struct
 type = struct task_struct {
     struct thread_info thread_info;
@@ -405,6 +405,8 @@ type = struct task_struct {
 (...)
     const struct cred *cred;
 (...)
+
+
 </code></pre><p>We may also check out the cred struct while we are at it:</p>
 <pre><code>(gdb) ptype struct cred
 type = struct cred {
