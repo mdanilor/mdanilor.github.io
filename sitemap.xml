@@ -8,11 +8,6 @@
   </url>
   
   <url>
-    <loc>https://mdanilor.github.io/en/</loc>
-    <lastmod>2020-04-28T18:01:34-03:00</lastmod>
-  </url>
-  
-  <url>
     <loc>https://mdanilor.github.io/tags/exploit/</loc>
     <lastmod>2020-04-28T18:01:34-03:00</lastmod>
   </url>
@@ -23,7 +18,7 @@
   </url>
   
   <url>
-    <loc>https://mdanilor.github.io/en/posts/hello-kernel/</loc>
+    <loc>https://mdanilor.github.io/posts/hello-kernel/</loc>
     <lastmod>2020-04-28T18:01:34-03:00</lastmod>
   </url>
   
@@ -39,6 +34,11 @@
   
   <url>
     <loc>https://mdanilor.github.io/tags/overflow/</loc>
+    <lastmod>2020-04-28T18:01:34-03:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://mdanilor.github.io/posts/</loc>
     <lastmod>2020-04-28T18:01:34-03:00</lastmod>
   </url>
   
@@ -66,7 +66,7 @@
   </url>
   
   <url>
-    <loc>https://mdanilor.github.io/en/posts/oscp-bof/</loc>
+    <loc>https://mdanilor.github.io/posts/oscp-bof/</loc>
   </url>
   
   <url>

