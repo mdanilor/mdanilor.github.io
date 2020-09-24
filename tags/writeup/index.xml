@@ -1,25 +1,15 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Onion Security</title>
-    <link>https://mdanilor.github.io/</link>
-    <description>Recent content on Onion Security</description>
+    <title>writeup on Onion Security</title>
+    <link>https://mdanilor.github.io/tags/writeup/</link>
+    <description>Recent content in writeup on Onion Security</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
-    <lastBuildDate>Tue, 28 Apr 2020 18:01:34 -0300</lastBuildDate>
     
-	<atom:link href="https://mdanilor.github.io/index.xml" rel="self" type="application/rss+xml" />
+	<atom:link href="https://mdanilor.github.io/tags/writeup/index.xml" rel="self" type="application/rss+xml" />
     
-    
-    <item>
-      <title>Hello, kernel: Exploiting an intentionally vulnerable Linux driver [Part 1]</title>
-      <link>https://mdanilor.github.io/en/posts/hello-kernel/</link>
-      <pubDate>Tue, 28 Apr 2020 18:01:34 -0300</pubDate>
-      
-      <guid>https://mdanilor.github.io/en/posts/hello-kernel/</guid>
-      <description>Hello, Kernel Linux: Exploiting an intentionally vulnerable Linux driver [Part 1] Intro and setup About a month ago I started doing some research during both my freetime and work hours (shout out to SiDi for allowing me the time!!!) on Kernel Linux exploitation. I find this to be not only a fascinating topic, but a very useful one too, since one of my primary functions at work is to assess the Android system.</description>
-    </item>
     
     <item>
       <title>Cracking an OSCP-like buffer overflow</title>
