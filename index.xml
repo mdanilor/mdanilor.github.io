@@ -22,23 +22,23 @@
     </item>
     
     <item>
+      <title>About Cebola</title>
+      <link>https://mdanilor.github.io/about-hugo/</link>
+      <pubDate>Thu, 24 Sep 2020 00:00:00 +0000</pubDate>
+      
+      <guid>https://mdanilor.github.io/about-hugo/</guid>
+      <description>$ whoami Computer Science student at University of Campinas and software security analyst at SiDi.
+I created this blog to post about the stuff I&amp;rsquo;m currently learning about, personal research, thoughts and other random stuff. My interests include:
+ Privacy Free and open source software Web application hacking Android security Binary exploitation Kernel exploitation Active directory hacking  You may contact me at mdanilor@protonmail.com</description>
+    </item>
+    
+    <item>
       <title>Hello, kernel: Exploiting an intentionally vulnerable Linux driver [Part 1]</title>
       <link>https://mdanilor.github.io/posts/hello-kernel/</link>
       <pubDate>Tue, 28 Apr 2020 18:01:34 -0300</pubDate>
       
       <guid>https://mdanilor.github.io/posts/hello-kernel/</guid>
       <description>Hello, Kernel Linux: Exploiting an intentionally vulnerable Linux driver [Part 1] Intro and setup About a month ago I started doing some research during both my freetime and work hours (shout out to SiDi for allowing me the time!!!) on Kernel Linux exploitation. I find this to be not only a fascinating topic, but a very useful one too, since one of my primary functions at work is to assess the Android system.</description>
-    </item>
-    
-    <item>
-      <title>About Hugo</title>
-      <link>https://mdanilor.github.io/about-hugo/</link>
-      <pubDate>Wed, 09 Apr 2014 00:00:00 +0000</pubDate>
-      
-      <guid>https://mdanilor.github.io/about-hugo/</guid>
-      <description>Hugo is the world’s fastest framework for building websites. It is written in Go.
-It makes use of a variety of open source projects including:
-Learn more and contribute on GitHub.</description>
     </item>
     
   </channel>

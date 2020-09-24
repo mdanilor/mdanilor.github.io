@@ -58,6 +58,11 @@
   </url>
   
   <url>
+    <loc>https://mdanilor.github.io/about-hugo/</loc>
+    <lastmod>2020-09-24T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
     <loc>https://mdanilor.github.io/tags/exploit/</loc>
     <lastmod>2020-04-28T18:01:34-03:00</lastmod>
   </url>
@@ -80,11 +85,6 @@
   <url>
     <loc>https://mdanilor.github.io/tags/stack/</loc>
     <lastmod>2020-04-28T18:01:34-03:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://mdanilor.github.io/about-hugo/</loc>
-    <lastmod>2014-04-09T00:00:00+00:00</lastmod>
   </url>
   
 </urlset>
