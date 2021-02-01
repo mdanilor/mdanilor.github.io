@@ -36,7 +36,8 @@ stack is executable. In addition, although you may find ASLR, you will also find
 one lib which conveniently does not have ASLR. If you are new to binary exploitation and
 buffer overflow and don&rsquo;t know much about these protections, don&rsquo;t worry! They are not
 important at this point (well, they are disabled!). This is a very introductory binary
-exploitation post.</p>
+exploitation post. But, if you are curious, you can check <a href="/posts/memory-protections/">this</a> post I&rsquo;ve made on
+memory protections.</p>
 <p>Allright! How do we turn this buffer overflow into a remote code execution vulnerability?
 When I started in infosec this seemed pretty magical. The answer to that lies in how the
 memory is organized. I have done a similar explaination on how the stack works in

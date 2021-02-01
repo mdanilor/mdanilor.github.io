@@ -11,7 +11,7 @@
 <meta itemprop="description" content="Tutorial on OSCP buffer overflow using a tryhackme OSCP BoF prep VM.">
 <meta itemprop="datePublished" content="2020-09-24T18:01:34-03:00" />
 <meta itemprop="dateModified" content="2020-09-24T18:01:34-03:00" />
-<meta itemprop="wordCount" content="2408">
+<meta itemprop="wordCount" content="2423">
 
 
 
@@ -93,7 +93,8 @@ stack is executable. In addition, although you may find ASLR, you will also find
 one lib which conveniently does not have ASLR. If you are new to binary exploitation and
 buffer overflow and don&rsquo;t know much about these protections, don&rsquo;t worry! They are not
 important at this point (well, they are disabled!). This is a very introductory binary
-exploitation post.</p>
+exploitation post. But, if you are curious, you can check <a href="/posts/memory-protections/">this</a> post I&rsquo;ve made on
+memory protections.</p>
 <p>Allright! How do we turn this buffer overflow into a remote code execution vulnerability?
 When I started in infosec this seemed pretty magical. The answer to that lies in how the
 memory is organized. I have done a similar explaination on how the stack works in
@@ -435,7 +436,7 @@ when generating the msfvenom payload, account for endianess or using the correct
 				<p>
 					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-tag meta-icon"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7" y2="7"></line></svg><span class="tag"><a href="https://mdanilor.github.io/tags/writeup">writeup</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/tryhackme">tryhackme</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/oscp">oscp</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/binary">binary</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/exploitation">exploitation</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/buffer">buffer</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/overflow">overflow</a></span>
 				</p>
-				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>2408 Words</p>
+				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>2423 Words</p>
 				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-calendar"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>2020-09-24 18:01 -0300</p>
 			</footer>
 		</article>
