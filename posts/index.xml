@@ -365,11 +365,11 @@ solved following the steps below:</p>
 <li>Generate payload</li>
 <li>Find a <code>jmp esp</code> gadget</li>
 <li>Put the gadget address in EIP offset and shellcode in ESP offset</li>
-<li>Get shell
-Besides following these steps, one must be careful not to fall in the common mistakes, such
-as forgetting to append NOPs before the shellcode, wrong badchars, forget to consider badchars
-when generating the msfvenom payload, account for endianess or using the correct payload.</li>
+<li>Get shell</li>
 </ul>
+<p>Besides following these steps, one must be careful not to fall in the common mistakes, such
+as forgetting to append NOPs before the shellcode, wrong badchars, forget to consider badchars
+when generating the msfvenom payload, account for endianess or using the correct payload.</p>
 <p>Finally, the secret is practice, practice, practice.</p>
 ]]></content>
 		</item>
@@ -612,7 +612,7 @@ Breakpoint 5, prepare_kernel_cred (daemon=0x0 &lt;fixed_percpu_data&gt;) at kern
 </code></pre><p>Now we go back to why we chose this function for our test.</p>
 <h3 id="finding-a-good-gadget-chain-for-privilege-escalation">Finding a good gadget chain for privilege escalation</h3>
 <p>We are able to redirect the flow of execution to wherever we please throughout the kernel. The goal here is to escalate privileges to root. But how do we do that?</p>
-<p>In order to find that out, we must first learn how the kernel stores a process&rsquo; credentials.</p>
+<p>In order to find that out, we must first learn how the kernel stores a process' credentials.</p>
 <p>Every thread in Linux has information stored in a struct named task_struct. According to Linux&rsquo;s own documentation, task_struct holds a pointer to another struct named creds:</p>
 <p><code>In Linux, all of a task’s credentials are held in (uid, gid) or through (groups, keys, LSM security) a refcounted structure of type ‘struct cred’. Each task points to its credentials by a pointer called ‘cred’ in its task_struct.</code></p>
 <p>(<a href="https://www.kernel.org/doc/html/v4.14/security/credentials.html#types-of-credentials">https://www.kernel.org/doc/html/v4.14/security/credentials.html#types-of-credentials</a>)</p>

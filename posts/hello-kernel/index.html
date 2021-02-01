@@ -15,7 +15,8 @@
 
 
 
-<meta itemprop="keywords" content="linux,kernel,exploit,exploitation,stack,overflow," /><meta property="og:title" content="Hello, kernel: Exploiting an intentionally vulnerable Linux driver [Part 1]" />
+<meta itemprop="keywords" content="linux,kernel,exploit,exploitation,stack,overflow," />
+<meta property="og:title" content="Hello, kernel: Exploiting an intentionally vulnerable Linux driver [Part 1]" />
 <meta property="og:description" content="A beginers guide into a Linux Kernel stack overflow vulnerability." />
 <meta property="og:type" content="article" />
 <meta property="og:url" content="https://mdanilor.github.io/posts/hello-kernel/" />
@@ -303,7 +304,7 @@ Breakpoint 5, prepare_kernel_cred (daemon=0x0 &lt;fixed_percpu_data&gt;) at kern
 </code></pre><p>Now we go back to why we chose this function for our test.</p>
 <h3 id="finding-a-good-gadget-chain-for-privilege-escalation">Finding a good gadget chain for privilege escalation<a href="#finding-a-good-gadget-chain-for-privilege-escalation" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
 <p>We are able to redirect the flow of execution to wherever we please throughout the kernel. The goal here is to escalate privileges to root. But how do we do that?</p>
-<p>In order to find that out, we must first learn how the kernel stores a process&rsquo; credentials.</p>
+<p>In order to find that out, we must first learn how the kernel stores a process' credentials.</p>
 <p>Every thread in Linux has information stored in a struct named task_struct. According to Linux&rsquo;s own documentation, task_struct holds a pointer to another struct named creds:</p>
 <p><code>In Linux, all of a task’s credentials are held in (uid, gid) or through (groups, keys, LSM security) a refcounted structure of type ‘struct cred’. Each task points to its credentials by a pointer called ‘cred’ in its task_struct.</code></p>
 <p>(<a href="https://www.kernel.org/doc/html/v4.14/security/credentials.html#types-of-credentials">https://www.kernel.org/doc/html/v4.14/security/credentials.html#types-of-credentials</a>)</p>
@@ -524,7 +525,7 @@ uid=0(root) gid=0(root) groups=0(root)
 	</main>
 
 	<footer id="site-footer" class="section-inner thin animated fadeIn faster">
-		<p>&copy; 2020 <a href="https://mdanilor.github.io">Danilo &#34;mdanilor&#34; Rodrigues</a> &#183; <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a></p>
+		<p>&copy; 2021 <a href="https://mdanilor.github.io">Danilo &#34;mdanilor&#34; Rodrigues</a> &#183; <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a></p>
 		<p>
 			Made with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> &#183; Theme <a href="https://github.com/Track3/hermit" target="_blank" rel="noopener">Hermit</a> &#183; <a href="https://mdanilor.github.io/posts/index.xml" target="_blank" title="rss"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-rss"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg></a>
 		</p>
