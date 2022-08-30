@@ -6,8 +6,85 @@
 		<generator>Hugo -- gohugo.io</generator>
 		<language>en-us</language>
 		<copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
-		<lastBuildDate>Mon, 01 Feb 2021 17:30:00 -0300</lastBuildDate>
+		<lastBuildDate>Mon, 29 Aug 2022 13:08:50 -0300</lastBuildDate>
 		<atom:link href="https://mdanilor.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
+		
+		<item>
+			<title>[Cracking Windows Kernel with HEVD] Chapter 0: Where do I start?</title>
+			<link>https://mdanilor.github.io/posts/hevd-0/</link>
+			<pubDate>Mon, 29 Aug 2022 13:08:50 -0300</pubDate>
+			
+			<guid>https://mdanilor.github.io/posts/hevd-0/</guid>
+			<description>Cracking HackSys Extreme Vulnerable Driver: where do I start? What is this? Hello! Previously we exploited vulnerable linux driver by invictus-0x90. If you missed, not to worry: this series is totally unrelated, since we&amp;rsquo;ll be exploiting the vulnerable Windows driver HEVD. However, if you are a curious one, make sure to check the other post!
+Today we&amp;rsquo;ll be attacking HEVD: HackSys Extreme Vulnerable Driver. This Windows driver is intentionally vulnerable to many memory corruption vulnerabilities (stack overflow, int overflow, use after free, type confusion, to name a few).</description>
+			<content type="html"><![CDATA[<h2 id="cracking-hacksys-extreme-vulnerable-driver-where-do-i-start">Cracking HackSys Extreme Vulnerable Driver: where do I start?</h2>
+<h3 id="what-is-this">What is this?</h3>
+<p>Hello! <a href="https://mdanilor.github.io/posts/hello-kernel/">Previously</a> we exploited <a href="https://github.com/invictus-0x90/vulnerable_linux_driver">vulnerable linux driver by invictus-0x90</a>. If you missed, not to worry: this series is totally unrelated, since we&rsquo;ll be exploiting the vulnerable <strong>Windows</strong> driver <a href="https://github.com/hacksysteam/HackSysExtremeVulnerableDriver">HEVD</a>. However, if you are a curious one, make sure to check the other post!</p>
+<p>Today we&rsquo;ll be attacking HEVD: HackSys Extreme Vulnerable Driver. This Windows driver is intentionally vulnerable to many memory corruption vulnerabilities (stack overflow, int overflow, use after free, type confusion, to name a few). We will exploit stack overflow to gain elevation of privileges in this post.</p>
+<p>This exercise is a &ldquo;must do&rdquo; if you are starting on Windows kernel exploitation. I would like to thank Payatu and HackSys for developing this extremely useful learning tool.</p>
+<p>Many people over the Internet have already solved it and posted writeups (probably way better than mine). However, most writeups I have read lack details on bypassing SMEP and KPTI. This part will be explained in depth here. Another rare, if not unique, feature of this post will be our sysret approach with KPTI.</p>
+<p>I warn you this post will be long and slow-paced, good for people who has experience with memory corruption vulnerabilities but are getting started in kernel hacking. It will also go in depth on advanced topics, such as kernel security mitigation bypasses, KPTI bypass and sysret. I have divided in 5 chapters to be released every other week:</p>
+<ul>
+<li>Chapter 0: Where do I start?</li>
+<li>Chapter 1: Will this driver ever crash?</li>
+<li>Chapter 2: Is there a way to bypass kASLR, SMEP and KVA Shadow?</li>
+<li>Chapter 3: Can we rop our way into triggering our shellcode?</li>
+<li>Chapter 4: How do we write a shellcode to elevate privileges and gracefully return to userland?</li>
+</ul>
+<p>Before we move on, I would like to thank a few friends, as I have not solved challenge by myself. Instead, it was an effort by me and my friends Viniboy, Giuliano and Psylinux through extensive Jitsi calls, a few frustration moments and a lot of joy at the end! Although we had some experience in Windows userland exploitation and Linux kernel exploitation, we did not know anything on Windows kernel exploitation. It has been quite a journey!</p>
+<p>Finally, I would also like to send my appreciation to <a href="https://sidi.org.br">SiDi</a>, my employer, for giving us the time and resources to study this topic.</p>
+<p>Now let&rsquo;s get started.</p>
+<h3 id="setting-up-the-environment">Setting up the environment</h3>
+<p>The environment setup is a little tricky. For some reason unknown to me (if you know why this happens, please send me an email), VirtualBox does not have SMEP support (if you don&rsquo;t know what SMEP is, just ignore the last sentence! I will go in depth about SMEP throughout this blog post, but for now just know it is a memory protection). Without SMEP, we miss half the fun. I recommend the latest Hyper-V or VMWare for this, since both support this protection. I will be using Hyper-V in this post, since it has a better performance for kernel debugging. Be advised that VMWare will most certainly have performance issues when debugging Windows kernel.</p>
+<p>First, download Windows 10 for Hyper-V or VMWare from <a href="https://developer.microsoft.com/pt-br/microsoft-edge/tools/vms/">the official Microsoft website</a>. You should also have a Windows host. If you don&rsquo;t have a Windows host, you can virtualize it aswell.</p>
+<p>The setup we&rsquo;ll organize here is basically this:</p>
+<pre><code>┌───────────────────────────┐
+│                           │
+│                           │
+│Windows 10 host (Debugger) │
+│                           │
+│                           │
+└─────────────▲─────────────┘
+              │
+  Attached to debugger on
+              │
+              │
+┌─────────────┴─────────────┐
+│                           │
+│                           │
+│  Windows 10 VM (Debuggee) │
+│                           │
+│                           │
+└───────────────────────────┘
+</code></pre><p>We have a Windows 10 VM (the one we just downloaded) which kernel we will attach to WinDbg debugger on our host. Pretty simple!</p>
+<p>Once you have downloaded the Windows VM, start it up on VMWare or Hyper-V. Open <code>cmd</code> as administrator and put the following:</p>
+<pre><code>bcdedit /debug on
+bcdedit /dbgsettings net hostip:&lt;HOST IP ADDR HERE&gt; port:50000
+</code></pre><p>A key will be given. Copy this key to your host.</p>
+<p><img src="/posts/kernel2-img/0-bcdedit.png" alt=""></p>
+<p>We should be able to attach a debugger now using this given key. Download <a href="https://developer.microsoft.com/en-us/windows/downloads/windows-sdk/">Windows SDK from the official Microsoft site</a> to your host. We&rsquo;ll use Microsoft&rsquo;s debugger WinDbg, which comes in this SDK.</p>
+<p>Open WinDbg on your host, go to file -&gt; kernel debugging. Leave the port number as 50000 and paste the key you copied from your guest (debuggee). Hit OK and reboot your guest.</p>
+<p><img src="/posts/kernel2-img/1-windbg-kernel-debugging.png" alt=""></p>
+<p>Once you have rebooted your VM, it should have been attached to the debugger. We will pause the execution to make sure everything is allright. If you are on Hyper-V on advanced mode, it will drop your connection until you restore execution (by pressing F5 on WinDbg).</p>
+<p><img src="/posts/kernel2-img/2-paused.png" alt=""></p>
+<p>I don&rsquo;t want to install Visual Studio in the debuggee machine, so I will create a shared folder between my host and VM to pass the exploit binary which I&rsquo;ll be building from my host machine. In addition, HEVD will also be sent through this shared folder. The way shared folders are created depend on whether you use VMWare or Hyper-V, so I&rsquo;ll ommit this part here.</p>
+<p><a href="https://github.com/hacksysteam/HackSysExtremeVulnerableDriver/releases/tag/v3.00">Download HEVD</a> to the debuggee machine and load it. This can be done by opening the command prompt as Administrator and executing the following:</p>
+<pre><code>sc create HEVD binPath= &lt;Path to HEVD root folder&gt;\driver\vulnerable\x64\HEVD.sys type= kernel
+sc start HEVD
+</code></pre><p>If a debugger is not attached, it will prompt an error on starting the service, as follows:</p>
+<p><img src="/posts/kernel2-img/3-error.png" alt=""></p>
+<p>If that happens, just attach the debugger and run it again:</p>
+<p><img src="/posts/kernel2-img/4-success.png" alt=""></p>
+<p>We are almost all set at this to start writing the exploit. But first, let&rsquo;s tune up WinDbg. If you open it vanilla, it will be ugly and will show only the command line. On WinDbg go to view and enable Memory, Call Stack, Disassembly and Memory. Organize it as you wish. Mine looks like this:</p>
+<p><img src="/posts/kernel2-img/5-mywindbg.png" alt=""></p>
+<p>Finally, we&rsquo;ll enable DbgPrint messages on WinDbg by pausing and inputing the following command:</p>
+<p><code>ed nt!Kd_IHVDRIVER_Mask 8</code></p>
+<p>To validate that it works, stop and start HEVD. If you see the debug messages, everything is all set!</p>
+<p><img src="/posts/kernel2-img/6-allset.png" alt=""></p>
+<p>The environment is done! You may now debug your kernel. Try out a few experiments! Pause it. Put breakpoints. The sky is the limit.</p>
+<p>On the next part we will analyze the vulnerable driver and start exploiting it. See you then!!</p>
+]]></content>
+		</item>
 		
 		<item>
 			<title>Understanding binary protections (and how to bypass) with a dumb example</title>
@@ -158,7 +235,7 @@ $
 <p>Well, very cute. According to wikipedia, coal miners used canaries to detect if there was any toxic gases, such as carbon monoxide, in the workplace. Or a snitch: an informant who sings to the police. And they totally mitigate stack overflow vulnerabilities.</p>
 <p>The issue with the program we wrote on the previous section was a stack overflow. That means we had a buffer in our stack on which we could write an arbitrary amount of data, even if it surpasses the designated size of the buffer. An adversary may overwrite other data in the memory, such as the return address, and make a flow hijack, leading to arbitrary code execution.</p>
 <p>The stack canary is made to detect if the return address was overwritten and make it more difficult to make a flow hijack.</p>
-<p>It works very simply, but also very elegantly. An 8 byte long semi-random integer is put before the return address in the stack (see the representation below). Before the function returns, it checks if the canary has been altered. If it hasn&rsquo;t, the flow continues gracefully. If it has, the program will crash. I said semi-random because not all bytes are random. There are 7 random bytes and a null byte ('\0'). If an adversary has an out of bounds write, he or she will have to overwrite the canary to get to the return address. The null byte was chosen because it is the string terminator. An adversary should have trouble inputting a string with a null byte. In case of a memory leak, the null byte will act as the string terminator before the canary can be printed.</p>
+<p>It works very simply, but also very elegantly. An 8 byte long semi-random integer is put before the return address in the stack (see the representation below). Before the function returns, it checks if the canary has been altered. If it hasn&rsquo;t, the flow continues gracefully. If it has, the program will crash. I said semi-random because not all bytes are random. There are 7 random bytes and a null byte ('\0&rsquo;). If an adversary has an out of bounds write, he or she will have to overwrite the canary to get to the return address. The null byte was chosen because it is the string terminator. An adversary should have trouble inputting a string with a null byte. In case of a memory leak, the null byte will act as the string terminator before the canary can be printed.</p>
 <pre><code>+-----------------------+
 |                       |
 |         ...           |
@@ -893,13 +970,13 @@ when generating the msfvenom payload, account for endianess or using the correct
 		</item>
 		
 		<item>
-			<title>Hello, kernel: Exploiting an intentionally vulnerable Linux driver [Part 1]</title>
+			<title>Hello, kernel: Exploiting an intentionally vulnerable Linux driver</title>
 			<link>https://mdanilor.github.io/posts/hello-kernel/</link>
 			<pubDate>Tue, 28 Apr 2020 18:01:34 -0300</pubDate>
 			
 			<guid>https://mdanilor.github.io/posts/hello-kernel/</guid>
-			<description>Hello, Kernel Linux: Exploiting an intentionally vulnerable Linux driver [Part 1] Intro and setup About a month ago I started doing some research during both my freetime and work hours (shout out to SiDi for allowing me the time!!!) on Kernel Linux exploitation. I find this to be not only a fascinating topic, but a very useful one too, since one of my primary functions at work is to assess the Android system.</description>
-			<content type="html"><![CDATA[<h2 id="hello-kernel-linux-exploiting-an-intentionally-vulnerable-linux-driver-part-1">Hello, Kernel Linux: Exploiting an intentionally vulnerable Linux driver [Part 1]</h2>
+			<description>Hello, kernel: Exploiting an intentionally vulnerable Linux driver Intro and setup About a month ago I started doing some research during both my freetime and work hours (shout out to SiDi for allowing me the time!!!) on Kernel Linux exploitation. I find this to be not only a fascinating topic, but a very useful one too, since one of my primary functions at work is to assess the Android system.</description>
+			<content type="html"><![CDATA[<h2 id="hello-kernel-exploiting-an-intentionally-vulnerable-linux-driver">Hello, kernel: Exploiting an intentionally vulnerable Linux driver</h2>
 <h3 id="intro-and-setup">Intro and setup</h3>
 <p>About a month ago I started doing some research during both my freetime and work hours (shout out to SiDi for allowing me the time!!!) on Kernel Linux exploitation. I find this to be not only a fascinating topic, but a very useful one too, since one of my primary functions at work is to assess the Android system.</p>
 <p>Ok, so let&rsquo;s get started. By this time you should be at least a little familiar with C and stack overflow exploitation in userland. You should also have a Linux VM running on QEMU attached to GDB. If you don&rsquo;t know how to set this up, don&rsquo;t worry. I had no idea when I started this either. I&rsquo;ll leave you with two blogposts below, the first will show you how to set up a Linux VM on QEMU (it&rsquo;s the same setup I&rsquo;m using here) and the second will show how to attach GDB to it. In addition, I&rsquo;ll leave two more links which should get you familiar with basic kernel development. If you have never developed at least a &ldquo;hello&rdquo; driver or built your own kernel, you should start with these.</p>
@@ -1130,7 +1207,7 @@ Breakpoint 5, prepare_kernel_cred (daemon=0x0 &lt;fixed_percpu_data&gt;) at kern
 </code></pre><p>Now we go back to why we chose this function for our test.</p>
 <h3 id="finding-a-good-gadget-chain-for-privilege-escalation">Finding a good gadget chain for privilege escalation</h3>
 <p>We are able to redirect the flow of execution to wherever we please throughout the kernel. The goal here is to escalate privileges to root. But how do we do that?</p>
-<p>In order to find that out, we must first learn how the kernel stores a process' credentials.</p>
+<p>In order to find that out, we must first learn how the kernel stores a process&rsquo; credentials.</p>
 <p>Every thread in Linux has information stored in a struct named task_struct. According to Linux&rsquo;s own documentation, task_struct holds a pointer to another struct named creds:</p>
 <p><code>In Linux, all of a task’s credentials are held in (uid, gid) or through (groups, keys, LSM security) a refcounted structure of type ‘struct cred’. Each task points to its credentials by a pointer called ‘cred’ in its task_struct.</code></p>
 <p>(<a href="https://www.kernel.org/doc/html/v4.14/security/credentials.html#types-of-credentials">https://www.kernel.org/doc/html/v4.14/security/credentials.html#types-of-credentials</a>)</p>

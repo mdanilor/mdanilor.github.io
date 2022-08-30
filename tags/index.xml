@@ -7,20 +7,33 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
-    <lastBuildDate>Mon, 01 Feb 2021 17:30:00 -0300</lastBuildDate><atom:link href="https://mdanilor.github.io/tags/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Mon, 29 Aug 2022 13:08:50 -0300</lastBuildDate>
+    
+	<atom:link href="https://mdanilor.github.io/tags/index.xml" rel="self" type="application/rss+xml" />
+    
+    
     <item>
-      <title>corruption</title>
-      <link>https://mdanilor.github.io/tags/corruption/</link>
-      <pubDate>Mon, 01 Feb 2021 17:30:00 -0300</pubDate>
+      <title>bypass</title>
+      <link>https://mdanilor.github.io/tags/bypass/</link>
+      <pubDate>Mon, 29 Aug 2022 13:08:50 -0300</pubDate>
       
-      <guid>https://mdanilor.github.io/tags/corruption/</guid>
+      <guid>https://mdanilor.github.io/tags/bypass/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>driver</title>
+      <link>https://mdanilor.github.io/tags/driver/</link>
+      <pubDate>Mon, 29 Aug 2022 13:08:50 -0300</pubDate>
+      
+      <guid>https://mdanilor.github.io/tags/driver/</guid>
       <description></description>
     </item>
     
     <item>
       <title>exploit</title>
       <link>https://mdanilor.github.io/tags/exploit/</link>
-      <pubDate>Mon, 01 Feb 2021 17:30:00 -0300</pubDate>
+      <pubDate>Mon, 29 Aug 2022 13:08:50 -0300</pubDate>
       
       <guid>https://mdanilor.github.io/tags/exploit/</guid>
       <description></description>
@@ -29,72 +42,63 @@
     <item>
       <title>exploitation</title>
       <link>https://mdanilor.github.io/tags/exploitation/</link>
-      <pubDate>Mon, 01 Feb 2021 17:30:00 -0300</pubDate>
+      <pubDate>Mon, 29 Aug 2022 13:08:50 -0300</pubDate>
       
       <guid>https://mdanilor.github.io/tags/exploitation/</guid>
       <description></description>
     </item>
     
     <item>
-      <title>heap</title>
-      <link>https://mdanilor.github.io/tags/heap/</link>
-      <pubDate>Mon, 01 Feb 2021 17:30:00 -0300</pubDate>
+      <title>extreme</title>
+      <link>https://mdanilor.github.io/tags/extreme/</link>
+      <pubDate>Mon, 29 Aug 2022 13:08:50 -0300</pubDate>
       
-      <guid>https://mdanilor.github.io/tags/heap/</guid>
+      <guid>https://mdanilor.github.io/tags/extreme/</guid>
       <description></description>
     </item>
     
     <item>
-      <title>linux</title>
-      <link>https://mdanilor.github.io/tags/linux/</link>
-      <pubDate>Mon, 01 Feb 2021 17:30:00 -0300</pubDate>
+      <title>hacksys</title>
+      <link>https://mdanilor.github.io/tags/hacksys/</link>
+      <pubDate>Mon, 29 Aug 2022 13:08:50 -0300</pubDate>
       
-      <guid>https://mdanilor.github.io/tags/linux/</guid>
+      <guid>https://mdanilor.github.io/tags/hacksys/</guid>
       <description></description>
     </item>
     
     <item>
-      <title>memory</title>
-      <link>https://mdanilor.github.io/tags/memory/</link>
-      <pubDate>Mon, 01 Feb 2021 17:30:00 -0300</pubDate>
+      <title>HEVD</title>
+      <link>https://mdanilor.github.io/tags/hevd/</link>
+      <pubDate>Mon, 29 Aug 2022 13:08:50 -0300</pubDate>
       
-      <guid>https://mdanilor.github.io/tags/memory/</guid>
+      <guid>https://mdanilor.github.io/tags/hevd/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>kernel</title>
+      <link>https://mdanilor.github.io/tags/kernel/</link>
+      <pubDate>Mon, 29 Aug 2022 13:08:50 -0300</pubDate>
+      
+      <guid>https://mdanilor.github.io/tags/kernel/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>kpti</title>
+      <link>https://mdanilor.github.io/tags/kpti/</link>
+      <pubDate>Mon, 29 Aug 2022 13:08:50 -0300</pubDate>
+      
+      <guid>https://mdanilor.github.io/tags/kpti/</guid>
       <description></description>
     </item>
     
     <item>
       <title>overflow</title>
       <link>https://mdanilor.github.io/tags/overflow/</link>
-      <pubDate>Mon, 01 Feb 2021 17:30:00 -0300</pubDate>
+      <pubDate>Mon, 29 Aug 2022 13:08:50 -0300</pubDate>
       
       <guid>https://mdanilor.github.io/tags/overflow/</guid>
-      <description></description>
-    </item>
-    
-    <item>
-      <title>rce</title>
-      <link>https://mdanilor.github.io/tags/rce/</link>
-      <pubDate>Mon, 01 Feb 2021 17:30:00 -0300</pubDate>
-      
-      <guid>https://mdanilor.github.io/tags/rce/</guid>
-      <description></description>
-    </item>
-    
-    <item>
-      <title>stack</title>
-      <link>https://mdanilor.github.io/tags/stack/</link>
-      <pubDate>Mon, 01 Feb 2021 17:30:00 -0300</pubDate>
-      
-      <guid>https://mdanilor.github.io/tags/stack/</guid>
-      <description></description>
-    </item>
-    
-    <item>
-      <title>binary</title>
-      <link>https://mdanilor.github.io/tags/binary/</link>
-      <pubDate>Thu, 24 Sep 2020 18:01:34 -0300</pubDate>
-      
-      <guid>https://mdanilor.github.io/tags/binary/</guid>
       <description></description>
     </item>
     

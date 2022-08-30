@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<meta name="theme-color" content="#ffffff">
+	<meta name="msapplication-TileColor" content="#ffffff">
+<meta itemprop="name" content="[Cracking Windows Kernel with HEVD] Chapter 0: Where do I start?">
+<meta itemprop="description" content="A beginers guide into a Windows kernel stack overflow vulnerability from zero to advanced bypasses.">
+<meta itemprop="datePublished" content="2022-08-29T13:08:50-03:00" />
+<meta itemprop="dateModified" content="2022-08-29T13:08:50-03:00" />
+<meta itemprop="wordCount" content="1046">
+
+
+
+<meta itemprop="keywords" content="windows,kernel,exploit,stack,overflow,hevd,HEVD,hacksys,extreme,vulnerable,driver,exploitation,smep,kpti,bypass,sysret," /><meta property="og:title" content="[Cracking Windows Kernel with HEVD] Chapter 0: Where do I start?" />
+<meta property="og:description" content="A beginers guide into a Windows kernel stack overflow vulnerability from zero to advanced bypasses." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://mdanilor.github.io/posts/hevd-0/" />
+<meta property="article:published_time" content="2022-08-29T13:08:50-03:00" />
+<meta property="article:modified_time" content="2022-08-29T13:08:50-03:00" />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="[Cracking Windows Kernel with HEVD] Chapter 0: Where do I start?"/>
+<meta name="twitter:description" content="A beginers guide into a Windows kernel stack overflow vulnerability from zero to advanced bypasses."/>
+
+	<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+	<link rel="manifest" href="/site.webmanifest">
+	<link rel="mask-icon" href="/safari-pinned-tab.svg" color="">
+	<link rel="shortcut icon" href="/favicon.ico">
+
+	<title>[Cracking Windows Kernel with HEVD] Chapter 0: Where do I start?</title>
+	<link rel="stylesheet" href="https://mdanilor.github.io/css/style.min.eac77496566fd7d5768fd650ddb0b2b181ca6a2d7c5fdd6fe6b8ba4bf47e566f.css" integrity="sha256-6sd0llZv19V2j9ZQ3bCysYHKai18X91v5ri6S/R+Vm8=" crossorigin="anonymous">
+	
+</head>
+
+<body id="page">
+	
+	<header id="site-header" class="animated slideInUp">
+		<div class="hdr-wrapper section-inner">
+			<div class="hdr-left">
+				<div class="site-branding">
+					<a href="https://mdanilor.github.io">Cebola Security</a>
+				</div>
+				<nav class="site-nav hide-in-mobile">
+					
+				<a href="https://mdanilor.github.io/posts/">Posts</a>
+				<a href="https://mdanilor.github.io/about-hugo/">About</a>
+
+				</nav>
+			</div>
+			<div class="hdr-right hdr-icons">
+				<span class="hdr-social hide-in-mobile"><a href="https://github.com/mdanilor" target="_blank" rel="noopener me" title="Github"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg></a></span><button id="menu-btn" class="hdr-btn" title="Menu"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+			</div>
+		</div>
+	</header>
+	<div id="mobile-menu" class="animated fast">
+		<ul>
+			<li><a href="https://mdanilor.github.io/posts/">Posts</a></li>
+			<li><a href="https://mdanilor.github.io/about-hugo/">About</a></li>
+		</ul>
+	</div>
+
+
+	<main class="site-main section-inner animated fadeIn faster">
+		<article class="thin">
+			<header class="post-header">
+				<div class="post-meta"><span>Aug 29, 2022</span></div>
+				<h1>[Cracking Windows Kernel with HEVD] Chapter 0: Where do I start?</h1>
+			</header>
+			<div class="content">
+				<h2 id="cracking-hacksys-extreme-vulnerable-driver-where-do-i-start">Cracking HackSys Extreme Vulnerable Driver: where do I start?<a href="#cracking-hacksys-extreme-vulnerable-driver-where-do-i-start" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
+<h3 id="what-is-this">What is this?<a href="#what-is-this" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>Hello! <a href="https://mdanilor.github.io/posts/hello-kernel/">Previously</a> we exploited <a href="https://github.com/invictus-0x90/vulnerable_linux_driver">vulnerable linux driver by invictus-0x90</a>. If you missed, not to worry: this series is totally unrelated, since we&rsquo;ll be exploiting the vulnerable <strong>Windows</strong> driver <a href="https://github.com/hacksysteam/HackSysExtremeVulnerableDriver">HEVD</a>. However, if you are a curious one, make sure to check the other post!</p>
+<p>Today we&rsquo;ll be attacking HEVD: HackSys Extreme Vulnerable Driver. This Windows driver is intentionally vulnerable to many memory corruption vulnerabilities (stack overflow, int overflow, use after free, type confusion, to name a few). We will exploit stack overflow to gain elevation of privileges in this post.</p>
+<p>This exercise is a &ldquo;must do&rdquo; if you are starting on Windows kernel exploitation. I would like to thank Payatu and HackSys for developing this extremely useful learning tool.</p>
+<p>Many people over the Internet have already solved it and posted writeups (probably way better than mine). However, most writeups I have read lack details on bypassing SMEP and KPTI. This part will be explained in depth here. Another rare, if not unique, feature of this post will be our sysret approach with KPTI.</p>
+<p>I warn you this post will be long and slow-paced, good for people who has experience with memory corruption vulnerabilities but are getting started in kernel hacking. It will also go in depth on advanced topics, such as kernel security mitigation bypasses, KPTI bypass and sysret. I have divided in 5 chapters to be released every other week:</p>
+<ul>
+<li>Chapter 0: Where do I start?</li>
+<li>Chapter 1: Will this driver ever crash?</li>
+<li>Chapter 2: Is there a way to bypass kASLR, SMEP and KVA Shadow?</li>
+<li>Chapter 3: Can we rop our way into triggering our shellcode?</li>
+<li>Chapter 4: How do we write a shellcode to elevate privileges and gracefully return to userland?</li>
+</ul>
+<p>Before we move on, I would like to thank a few friends, as I have not solved challenge by myself. Instead, it was an effort by me and my friends Viniboy, Giuliano and Psylinux through extensive Jitsi calls, a few frustration moments and a lot of joy at the end! Although we had some experience in Windows userland exploitation and Linux kernel exploitation, we did not know anything on Windows kernel exploitation. It has been quite a journey!</p>
+<p>Finally, I would also like to send my appreciation to <a href="https://sidi.org.br">SiDi</a>, my employer, for giving us the time and resources to study this topic.</p>
+<p>Now let&rsquo;s get started.</p>
+<h3 id="setting-up-the-environment">Setting up the environment<a href="#setting-up-the-environment" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>The environment setup is a little tricky. For some reason unknown to me (if you know why this happens, please send me an email), VirtualBox does not have SMEP support (if you don&rsquo;t know what SMEP is, just ignore the last sentence! I will go in depth about SMEP throughout this blog post, but for now just know it is a memory protection). Without SMEP, we miss half the fun. I recommend the latest Hyper-V or VMWare for this, since both support this protection. I will be using Hyper-V in this post, since it has a better performance for kernel debugging. Be advised that VMWare will most certainly have performance issues when debugging Windows kernel.</p>
+<p>First, download Windows 10 for Hyper-V or VMWare from <a href="https://developer.microsoft.com/pt-br/microsoft-edge/tools/vms/">the official Microsoft website</a>. You should also have a Windows host. If you don&rsquo;t have a Windows host, you can virtualize it aswell.</p>
+<p>The setup we&rsquo;ll organize here is basically this:</p>
+<pre><code>┌───────────────────────────┐
+│                           │
+│                           │
+│Windows 10 host (Debugger) │
+│                           │
+│                           │
+└─────────────▲─────────────┘
+              │
+  Attached to debugger on
+              │
+              │
+┌─────────────┴─────────────┐
+│                           │
+│                           │
+│  Windows 10 VM (Debuggee) │
+│                           │
+│                           │
+└───────────────────────────┘
+</code></pre><p>We have a Windows 10 VM (the one we just downloaded) which kernel we will attach to WinDbg debugger on our host. Pretty simple!</p>
+<p>Once you have downloaded the Windows VM, start it up on VMWare or Hyper-V. Open <code>cmd</code> as administrator and put the following:</p>
+<pre><code>bcdedit /debug on
+bcdedit /dbgsettings net hostip:&lt;HOST IP ADDR HERE&gt; port:50000
+</code></pre><p>A key will be given. Copy this key to your host.</p>
+<p><img src="/posts/kernel2-img/0-bcdedit.png" alt=""></p>
+<p>We should be able to attach a debugger now using this given key. Download <a href="https://developer.microsoft.com/en-us/windows/downloads/windows-sdk/">Windows SDK from the official Microsoft site</a> to your host. We&rsquo;ll use Microsoft&rsquo;s debugger WinDbg, which comes in this SDK.</p>
+<p>Open WinDbg on your host, go to file -&gt; kernel debugging. Leave the port number as 50000 and paste the key you copied from your guest (debuggee). Hit OK and reboot your guest.</p>
+<p><img src="/posts/kernel2-img/1-windbg-kernel-debugging.png" alt=""></p>
+<p>Once you have rebooted your VM, it should have been attached to the debugger. We will pause the execution to make sure everything is allright. If you are on Hyper-V on advanced mode, it will drop your connection until you restore execution (by pressing F5 on WinDbg).</p>
+<p><img src="/posts/kernel2-img/2-paused.png" alt=""></p>
+<p>I don&rsquo;t want to install Visual Studio in the debuggee machine, so I will create a shared folder between my host and VM to pass the exploit binary which I&rsquo;ll be building from my host machine. In addition, HEVD will also be sent through this shared folder. The way shared folders are created depend on whether you use VMWare or Hyper-V, so I&rsquo;ll ommit this part here.</p>
+<p><a href="https://github.com/hacksysteam/HackSysExtremeVulnerableDriver/releases/tag/v3.00">Download HEVD</a> to the debuggee machine and load it. This can be done by opening the command prompt as Administrator and executing the following:</p>
+<pre><code>sc create HEVD binPath= &lt;Path to HEVD root folder&gt;\driver\vulnerable\x64\HEVD.sys type= kernel
+sc start HEVD
+</code></pre><p>If a debugger is not attached, it will prompt an error on starting the service, as follows:</p>
+<p><img src="/posts/kernel2-img/3-error.png" alt=""></p>
+<p>If that happens, just attach the debugger and run it again:</p>
+<p><img src="/posts/kernel2-img/4-success.png" alt=""></p>
+<p>We are almost all set at this to start writing the exploit. But first, let&rsquo;s tune up WinDbg. If you open it vanilla, it will be ugly and will show only the command line. On WinDbg go to view and enable Memory, Call Stack, Disassembly and Memory. Organize it as you wish. Mine looks like this:</p>
+<p><img src="/posts/kernel2-img/5-mywindbg.png" alt=""></p>
+<p>Finally, we&rsquo;ll enable DbgPrint messages on WinDbg by pausing and inputing the following command:</p>
+<p><code>ed nt!Kd_IHVDRIVER_Mask 8</code></p>
+<p>To validate that it works, stop and start HEVD. If you see the debug messages, everything is all set!</p>
+<p><img src="/posts/kernel2-img/6-allset.png" alt=""></p>
+<p>The environment is done! You may now debug your kernel. Try out a few experiments! Pause it. Put breakpoints. The sky is the limit.</p>
+<p>On the next part we will analyze the vulnerable driver and start exploiting it. See you then!!</p>
+
+			</div>
+			<hr class="post-end">
+			<footer class="post-info">
+				<p>
+					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-tag meta-icon"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7" y2="7"></line></svg><span class="tag"><a href="https://mdanilor.github.io/tags/windows">windows</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/kernel">kernel</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/exploit">exploit</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/stack">stack</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/overflow">overflow</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/hevd">hevd</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/hevd">HEVD</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/hacksys">hacksys</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/extreme">extreme</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/vulnerable">vulnerable</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/driver">driver</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/exploitation">exploitation</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/smep">smep</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/kpti">kpti</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/bypass">bypass</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/sysret">sysret</a></span>
+				</p>
+				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>1046 Words</p>
+				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-calendar"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>2022-08-29 13:08 -0300</p>
+			</footer>
+		</article>
+		<div class="post-nav thin">
+			<a class="prev-post" href="https://mdanilor.github.io/posts/memory-protections/">
+				<span class="post-nav-label">Older&nbsp;<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></span><br><span>Understanding binary protections (and how to bypass) with a dumb example</span>
+			</a>
+		</div>
+		<div id="comments" class="thin">
+</div>
+	</main>
+
+	<footer id="site-footer" class="section-inner thin animated fadeIn faster">
+		<p>&copy; 2022 <a href="https://mdanilor.github.io">Danilo &#34;mdanilor&#34; Rodrigues</a> &#183; <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a></p>
+		<p>
+			Made with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> &#183; Theme <a href="https://github.com/Track3/hermit" target="_blank" rel="noopener">Hermit</a> &#183; <a href="https://mdanilor.github.io/posts/index.xml" target="_blank" title="rss"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-rss"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg></a>
+		</p>
+	</footer>
+
+
+
+	<script src="https://mdanilor.github.io/js/bundle.min.4a9a0ac3d2217822c7865b4161e6c2a71de1d70492264337755427898dd718f6.js" integrity="sha256-SpoKw9IheCLHhltBYebCpx3h1wSSJkM3dVQniY3XGPY=" crossorigin="anonymous"></script>
+	
+
+</body>
+
+</html>

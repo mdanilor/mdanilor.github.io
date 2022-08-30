@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>bypass on Cebola Security</title>
+    <link>https://mdanilor.github.io/tags/bypass/</link>
+    <description>Recent content in bypass on Cebola Security</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
+    <lastBuildDate>Mon, 29 Aug 2022 13:08:50 -0300</lastBuildDate>
+    
+	<atom:link href="https://mdanilor.github.io/tags/bypass/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>[Cracking Windows Kernel with HEVD] Chapter 0: Where do I start?</title>
+      <link>https://mdanilor.github.io/posts/hevd-0/</link>
+      <pubDate>Mon, 29 Aug 2022 13:08:50 -0300</pubDate>
+      
+      <guid>https://mdanilor.github.io/posts/hevd-0/</guid>
+      <description>Cracking HackSys Extreme Vulnerable Driver: where do I start? What is this? Hello! Previously we exploited vulnerable linux driver by invictus-0x90. If you missed, not to worry: this series is totally unrelated, since we&amp;rsquo;ll be exploiting the vulnerable Windows driver HEVD. However, if you are a curious one, make sure to check the other post!
+Today we&amp;rsquo;ll be attacking HEVD: HackSys Extreme Vulnerable Driver. This Windows driver is intentionally vulnerable to many memory corruption vulnerabilities (stack overflow, int overflow, use after free, type confusion, to name a few).</description>
+    </item>
+    
+  </channel>
+</rss>

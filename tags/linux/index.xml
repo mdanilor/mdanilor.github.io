@@ -7,7 +7,11 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
-    <lastBuildDate>Mon, 01 Feb 2021 17:30:00 -0300</lastBuildDate><atom:link href="https://mdanilor.github.io/tags/linux/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Mon, 01 Feb 2021 17:30:00 -0300</lastBuildDate>
+    
+	<atom:link href="https://mdanilor.github.io/tags/linux/index.xml" rel="self" type="application/rss+xml" />
+    
+    
     <item>
       <title>Understanding binary protections (and how to bypass) with a dumb example</title>
       <link>https://mdanilor.github.io/posts/memory-protections/</link>
@@ -19,12 +23,12 @@ Memory corruption issues often lead to pretty serious vulnerabilities. It is not
     </item>
     
     <item>
-      <title>Hello, kernel: Exploiting an intentionally vulnerable Linux driver [Part 1]</title>
+      <title>Hello, kernel: Exploiting an intentionally vulnerable Linux driver</title>
       <link>https://mdanilor.github.io/posts/hello-kernel/</link>
       <pubDate>Tue, 28 Apr 2020 18:01:34 -0300</pubDate>
       
       <guid>https://mdanilor.github.io/posts/hello-kernel/</guid>
-      <description>Hello, Kernel Linux: Exploiting an intentionally vulnerable Linux driver [Part 1] Intro and setup About a month ago I started doing some research during both my freetime and work hours (shout out to SiDi for allowing me the time!!!) on Kernel Linux exploitation. I find this to be not only a fascinating topic, but a very useful one too, since one of my primary functions at work is to assess the Android system.</description>
+      <description>Hello, kernel: Exploiting an intentionally vulnerable Linux driver Intro and setup About a month ago I started doing some research during both my freetime and work hours (shout out to SiDi for allowing me the time!!!) on Kernel Linux exploitation. I find this to be not only a fascinating topic, but a very useful one too, since one of my primary functions at work is to assess the Android system.</description>
     </item>
     
   </channel>

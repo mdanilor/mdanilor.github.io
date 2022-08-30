@@ -15,8 +15,7 @@
 
 
 
-<meta itemprop="keywords" content="linux,exploit,exploitation,stack,overflow,heap,memory,corruption,rce," />
-<meta property="og:title" content="Understanding binary protections (and how to bypass) with a dumb example" />
+<meta itemprop="keywords" content="linux,exploit,exploitation,stack,overflow,heap,memory,corruption,rce," /><meta property="og:title" content="Understanding binary protections (and how to bypass) with a dumb example" />
 <meta property="og:description" content="What features are in place to protect your system from memory corruption? And how to bypass them?" />
 <meta property="og:type" content="article" />
 <meta property="og:url" content="https://mdanilor.github.io/posts/memory-protections/" />
@@ -214,7 +213,7 @@ $
 <p>Well, very cute. According to wikipedia, coal miners used canaries to detect if there was any toxic gases, such as carbon monoxide, in the workplace. Or a snitch: an informant who sings to the police. And they totally mitigate stack overflow vulnerabilities.</p>
 <p>The issue with the program we wrote on the previous section was a stack overflow. That means we had a buffer in our stack on which we could write an arbitrary amount of data, even if it surpasses the designated size of the buffer. An adversary may overwrite other data in the memory, such as the return address, and make a flow hijack, leading to arbitrary code execution.</p>
 <p>The stack canary is made to detect if the return address was overwritten and make it more difficult to make a flow hijack.</p>
-<p>It works very simply, but also very elegantly. An 8 byte long semi-random integer is put before the return address in the stack (see the representation below). Before the function returns, it checks if the canary has been altered. If it hasn&rsquo;t, the flow continues gracefully. If it has, the program will crash. I said semi-random because not all bytes are random. There are 7 random bytes and a null byte ('\0'). If an adversary has an out of bounds write, he or she will have to overwrite the canary to get to the return address. The null byte was chosen because it is the string terminator. An adversary should have trouble inputting a string with a null byte. In case of a memory leak, the null byte will act as the string terminator before the canary can be printed.</p>
+<p>It works very simply, but also very elegantly. An 8 byte long semi-random integer is put before the return address in the stack (see the representation below). Before the function returns, it checks if the canary has been altered. If it hasn&rsquo;t, the flow continues gracefully. If it has, the program will crash. I said semi-random because not all bytes are random. There are 7 random bytes and a null byte ('\0&rsquo;). If an adversary has an out of bounds write, he or she will have to overwrite the canary to get to the return address. The null byte was chosen because it is the string terminator. An adversary should have trouble inputting a string with a null byte. In case of a memory leak, the null byte will act as the string terminator before the canary can be printed.</p>
 <pre><code>+-----------------------+
 |                       |
 |         ...           |
@@ -591,6 +590,9 @@ End of assembler dump.
 			</footer>
 		</article>
 		<div class="post-nav thin">
+			<a class="next-post" href="https://mdanilor.github.io/posts/hevd-0/">
+				<span class="post-nav-label"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-left"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>&nbsp;Newer</span><br><span>[Cracking Windows Kernel with HEVD] Chapter 0: Where do I start?</span>
+			</a>
 			<a class="prev-post" href="https://mdanilor.github.io/posts/oscp-bof/">
 				<span class="post-nav-label">Older&nbsp;<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></span><br><span>Cracking an OSCP-like buffer overflow</span>
 			</a>
@@ -600,7 +602,7 @@ End of assembler dump.
 	</main>
 
 	<footer id="site-footer" class="section-inner thin animated fadeIn faster">
-		<p>&copy; 2021 <a href="https://mdanilor.github.io">Danilo &#34;mdanilor&#34; Rodrigues</a> &#183; <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a></p>
+		<p>&copy; 2022 <a href="https://mdanilor.github.io">Danilo &#34;mdanilor&#34; Rodrigues</a> &#183; <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a></p>
 		<p>
 			Made with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> &#183; Theme <a href="https://github.com/Track3/hermit" target="_blank" rel="noopener">Hermit</a> &#183; <a href="https://mdanilor.github.io/posts/index.xml" target="_blank" title="rss"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-rss"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg></a>
 		</p>
