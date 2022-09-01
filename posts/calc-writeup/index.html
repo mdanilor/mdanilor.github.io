@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<meta name="theme-color" content="#ffffff">
+	<meta name="msapplication-TileColor" content="#ffffff">
+<meta itemprop="name" content="Pwning a pwnable calc (writeup)">
+<meta itemprop="description" content="My writeup on pwnable.tw&#39;s calc challenge">
+<meta itemprop="datePublished" content="2020-03-06T18:01:34-03:00" />
+<meta itemprop="dateModified" content="2020-03-06T18:01:34-03:00" />
+<meta itemprop="wordCount" content="1350">
+
+
+
+<meta itemprop="keywords" content="writeup,pwnable,calc,binary,exploitation," /><meta property="og:title" content="Pwning a pwnable calc (writeup)" />
+<meta property="og:description" content="My writeup on pwnable.tw&#39;s calc challenge" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://mdanilor.github.io/posts/calc-writeup/" />
+<meta property="article:published_time" content="2020-03-06T18:01:34-03:00" />
+<meta property="article:modified_time" content="2020-03-06T18:01:34-03:00" />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Pwning a pwnable calc (writeup)"/>
+<meta name="twitter:description" content="My writeup on pwnable.tw&#39;s calc challenge"/>
+
+	<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+	<link rel="manifest" href="/site.webmanifest">
+	<link rel="mask-icon" href="/safari-pinned-tab.svg" color="">
+	<link rel="shortcut icon" href="/favicon.ico">
+
+	<title>Pwning a pwnable calc (writeup)</title>
+	<link rel="stylesheet" href="https://mdanilor.github.io/css/style.min.eac77496566fd7d5768fd650ddb0b2b181ca6a2d7c5fdd6fe6b8ba4bf47e566f.css" integrity="sha256-6sd0llZv19V2j9ZQ3bCysYHKai18X91v5ri6S/R+Vm8=" crossorigin="anonymous">
+	
+</head>
+
+<body id="page">
+	
+	<header id="site-header" class="animated slideInUp">
+		<div class="hdr-wrapper section-inner">
+			<div class="hdr-left">
+				<div class="site-branding">
+					<a href="https://mdanilor.github.io">Cebola Security</a>
+				</div>
+				<nav class="site-nav hide-in-mobile">
+					
+				<a href="https://mdanilor.github.io/posts/">Posts</a>
+				<a href="https://mdanilor.github.io/about-hugo/">About</a>
+
+				</nav>
+			</div>
+			<div class="hdr-right hdr-icons">
+				<span class="hdr-social hide-in-mobile"><a href="https://github.com/mdanilor" target="_blank" rel="noopener me" title="Github"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg></a></span><button id="menu-btn" class="hdr-btn" title="Menu"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+			</div>
+		</div>
+	</header>
+	<div id="mobile-menu" class="animated fast">
+		<ul>
+			<li><a href="https://mdanilor.github.io/posts/">Posts</a></li>
+			<li><a href="https://mdanilor.github.io/about-hugo/">About</a></li>
+		</ul>
+	</div>
+
+
+	<main class="site-main section-inner animated fadeIn faster">
+		<article class="thin">
+			<header class="post-header">
+				<div class="post-meta"><span>Mar 6, 2020</span></div>
+				<h1>Pwning a pwnable calc (writeup)</h1>
+			</header>
+			<div class="content">
+				<p>Hi! A friend of mine presented me a website with several linux binaries waiting to be exploited. At the time he told me they were very difficult. I found that to actually be an understatement.
+Even the first challenge on pwnable.tw (which is supposed to be just a hello, binexp) required a lot of thinking to me. If you are into binary exploitation and already have some experience, I very much recommend that you give it a try.
+I started this writeup a few days after I finished it during my work vacations just to remember the though process under it and maybe learn a bit more. This article will contain <strong>MAJOR SPOILERS</strong> for this challenge.
+If you haven&rsquo;t done it yet, I sincerely recommend that you try your best before reading this post. Let&rsquo;s get going with this.</p>
+<h2 id="finding-the-vulnerability">Finding the vulnerability<a href="#finding-the-vulnerability" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
+<p>The challenge may be found in <a href="https://pwnable.tw/challenge/">https://pwnable.tw/challenge/</a> by the name of &ldquo;calc&rdquo;. Once I downloaded it and played with it a couple of times, I could easily notice that it was a simple calculator (duuh):</p>
+<pre><code>└────╼ ./calc
+=== Welcome to SECPROG calculator ===
+1+1
+2
+5*5
+25
+32/6
+5
+</code></pre><p>I then ran it several times. Again and again attempting to find a memory corruption or any vulnerability that may trigger a code execution. I even found out that if some time was passed without entering any calculations, the calc would just close on me saying there&rsquo;s &ldquo;No time to waste!&quot;.</p>
+<p>About pwnable&rsquo;s challenges, they are Linux elf files. The communication is made through regular I/O. In their server there&rsquo;s some mechanism to forward the I/O through the Internet, so the same calc can be accessed remotely in chall.pwnable.tw:10100.</p>
+<pre><code>└────╼ nc chall.pwnable.tw 10100
+=== Welcome to SECPROG calculator ===
+1+1
+2
+</code></pre><p>So the idea here is to find a way to execute code remotely to read the flag in /home/calc/flag.</p>
+<p>Having the binary in your computer comes in handy for analysis, though. You may exploit the binary locally before doing it remotely.</p>
+<p>So back to finding the vuln, I tried running the program with many inputs for several minutes hoping for a crash, but that did not happen. I could not make it crash. After that, I peeked into the assembly code hoping it would bring some light, but it brought me no closer to find the vulnerability I was looking for.</p>
+<p>I decided to give it some time and focus on other things. A few days have passed when this thought crossed my mind: &ldquo;hey, I&rsquo;m being really stupid here. Why don&rsquo;t I just use valgrind and try to find a memory leak or something?&quot;. I don&rsquo;t do CTFs very often and felt really stupid that this thought took so long to cross my mind.</p>
+<p>Let&rsquo;s valgrind this away:</p>
+<pre><code>valgrind --tool=memcheck --leak-check=yes --track-origins=yes ./calc
+</code></pre><p>I&rsquo;m no valgrind expert. In fact, this was the first time I used it at all. By running it I found several warnings such as these:</p>
+<pre><code>==43990== Conditional jump or move depends on uninitialised value(s)
+==43990==    at 0x807F2A6: vfprintf (in /home/dan/study/binexp/pwnable/calc/calc)
+==43990==    by 0x804FF7F: printf (in /home/dan/study/binexp/pwnable/calc/calc)
+==43990==    by 0x8049415: calc (in /home/dan/study/binexp/pwnable/calc/calc)
+==43990==    by 0x8049498: main (in /home/dan/study/binexp/pwnable/calc/calc)
+==43990==  Uninitialised value was created by a stack allocation
+==43990==    at 0x804937C: calc (in /home/dan/study/binexp/pwnable/calc/calc)
+==43990==
+</code></pre><p>These could be interesting. But did not seem to be what I was looking for here.</p>
+<p>After putting inputs as invalid as I could think (texts, division by zero, negative numbers, positive numbers), I noticed that if some negative number was passed as the first number in the expression, interesting things would happen:</p>
+<pre><code>-100-100
+==43990== Invalid write of size 4
+==43990==    at 0x8049160: parse_expr (in /home/dan/study/binexp/pwnable/calc/calc)
+==43990==    by 0x80493F1: calc (in /home/dan/study/binexp/pwnable/calc/calc)
+==43990==    by 0x8049498: main (in /home/dan/study/binexp/pwnable/calc/calc)
+==43990==  Address 0xfeab5b9c is on thread 1's stack
+==43990==  196 bytes below stack pointer
+==43990==
+==43990== Invalid read of size 4
+==43990==    at 0x8048F61: eval (in /home/dan/study/binexp/pwnable/calc/calc)
+==43990==    by 0x8049307: parse_expr (in /home/dan/study/binexp/pwnable/calc/calc)
+==43990==    by 0x80493F1: calc (in /home/dan/study/binexp/pwnable/calc/calc)
+==43990==    by 0x8049498: main (in /home/dan/study/binexp/pwnable/calc/calc)
+==43990==  Address 0xfeab5b98 is on thread 1's stack
+==43990==  180 bytes below stack pointer
+</code></pre><p>BINGO! Memory corruption! That&rsquo;s exactly what we want!
+It appears that memory corruption occurs when the expression starts with the minus sign. Both invalid read and write. Let&rsquo;s do some digging:</p>
+<pre><code>└╼ ./calc 
+=== Welcome to SECPROG calculator ===
+-1
+0
+-2
+0
+-3
+0
+-4
+0
+-5
+-8145352
+-6
+-8144948
+-7
+134517746
+-8
+-8143912
+-4+4
+4
+-4
+4
+</code></pre><p>When we put -5, -6, -7 and -8, some data is spit on us. Also, when I do -4+4, it seems to alter when I put -4 again. Still don&rsquo;t know exactly what&rsquo;s going on. After more digging, I noticed that if I put -8+X, with X being a random number, the program would crash. Interesting&hellip; Let&rsquo;s see what valgring has to say about that:</p>
+<pre><code>-8+16
+(...)
+==44296== Jump to the invalid address stated on the next line
+==44296==    at 0x10: ???
+==44296==    by 0x80481AF: ??? (in /home/dan/study/binexp/pwnable/calc/calc)
+==44296==  Address 0x8 is not stack'd, malloc'd or (recently) free'd
+(...)
+Segmentation fault.
+</code></pre><p>Maybe we can get antother crash?</p>
+<pre><code>└────╼ ./calc
+=== Welcome to SECPROG calculator ===
+-9-9
+Segmentation fault
+
+└╼ ./calc
+=== Welcome to SECPROG calculator ===
+-10-10
+-10
+-11-11
+*** stack smashing detected ***: ./calc terminated
+</code></pre><p>oops&hellip; It seems that in -11 we have messed up with some stack canary. Let&rsquo;s investigate with gdb:</p>
+<pre><code>gdb ./calc
+(...)
+(gdb) r
+Starting program: /home/dan/study/binexp/pwnable/calc/calc
+=== Welcome to SECPROG calculator ===
+-11-11
+*** stack smashing detected ***: /home/dan/study/binexp/pwnable/calc/calc terminated
+
+Program received signal SIGABRT, Aborted.
+0xf7ffd159 in __kernel_vsyscall ()
+(gdb) i s
+#0  0xf7ffd159 in __kernel_vsyscall ()
+#1  0x0807cca7 in raise ()
+#2  0x0804e6d1 in abort ()
+#3  0x08050a12 in __libc_message ()
+#4  0x08070474 in __fortify_fail ()
+#5  0x0807041d in __stack_chk_fail ()
+#6  0x08049370 in parse_expr ()
+#7  0x080493f2 in calc ()
+#8  0x08049499 in main ()
+
+</code></pre><p>Very interesting&hellip; the crash happened during what I believe to be a libc read wrapper. The canary exploded the program. But by inspecting the stack, we see the address to which the program was supposed to return if everything went ok (<code>#6  0x08049370 in parse_expr ()</code>). Let&rsquo;s put a breakpoint in that address and try again.</p>
+<p>If we hit the canary this time, it will never reach the parse_expr return point. Let&rsquo;s try with -8 again.</p>
+<pre><code>(gdb) b *0x8049370
+Breakpoint 1 at 0x8049370
+(gdb) r
+The program being debugged has been started already.
+Start it from the beginning? (y or n) y
+Starting program: /home/dan/study/binexp/pwnable/calc/calc
+=== Welcome to SECPROG calculator ===
+-8+8
+
+Breakpoint 1, 0x08049370 in parse_expr ()
+(gdb) i s
+#0  0x08049370 in parse_expr ()
+#1  0x00000008 in ?? ()
+#2  0xffffcf5c in ?? ()
+#3  0x08049434 in calc ()
+#4  0xffffd41c in ?? ()
+</code></pre><p>Yeah! The breakpoint was hit. And we may see that the next return address in stack is 8. What the hell?</p>
+<p>Aparently, -8+SOMETHING will write to the first return address. Maybe we can write to other memory positions?</p>
+<pre><code>(gdb) r
+The program being debugged has been started already.
+Start it from the beginning? (y or n) y
+Starting program: /home/dan/study/binexp/pwnable/calc/calc
+=== Welcome to SECPROG calculator ===
+-1+1
+
+Breakpoint 1, 0x08049370 in parse_expr ()
+(gdb) c
+Continuing.
+1
+-2+2
+
+Breakpoint 1, 0x08049370 in parse_expr ()
+(gdb) c
+Continuing.
+2
+-3+3
+
+Breakpoint 1, 0x08049370 in parse_expr ()
+(gdb) c
+Continuing.
+3
+-4+4
+
+Breakpoint 1, 0x08049370 in parse_expr ()
+(gdb) c
+Continuing.
+4
+-5+5
+
+Breakpoint 1, 0x08049370 in parse_expr ()
+(gdb) c
+Continuing.
+-12851
+-6+6
+
+Breakpoint 1, 0x08049370 in parse_expr ()
+(gdb) c
+Continuing.
+-12446
+-7+7
+
+Breakpoint 1, 0x08049370 in parse_expr ()
+(gdb) c
+Continuing.
+
+Program received signal SIGSEGV, Segmentation fault.
+0x080493f9 in calc ()
+(gdb) x/10x $esp
+0xffffcdb0:	0x00000007	0xffffcdc8	0x00000005	0x00000004
+0xffffcdc0:	0x00000003	0x00000002	0xfffffff9	0x00000007
+0xffffcdd0:	0x00000000	0x00000000
+(gdb) p/x $eip
+$1 = 0x80493f9
+</code></pre><p>We were able to write to some positions in the stack. And as the first value of the expression (-1, -2, &hellip;) decreased (and the absolute value increased), the memory position altered also decreased. Not all memory positions were correctly overwritten, though. And overwriting the position -7 also broke the program.</p>
+<p>We are starting to grasp what&rsquo;s going on here.</p>
+
+			</div>
+			<hr class="post-end">
+			<footer class="post-info">
+				<p>
+					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-tag meta-icon"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7" y2="7"></line></svg><span class="tag"><a href="https://mdanilor.github.io/tags/writeup">writeup</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/pwnable">pwnable</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/calc">calc</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/binary">binary</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/exploitation">exploitation</a></span>
+				</p>
+				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>1350 Words</p>
+				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-calendar"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>2020-03-06 18:01 -0300</p>
+			</footer>
+		</article>
+		<div class="post-nav thin">
+			<a class="next-post" href="https://mdanilor.github.io/posts/hello-kernel/">
+				<span class="post-nav-label"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-left"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>&nbsp;Newer</span><br><span>Hello, kernel: Exploiting an intentionally vulnerable Linux driver</span>
+			</a>
+		</div>
+		<div id="comments" class="thin">
+</div>
+	</main>
+
+	<footer id="site-footer" class="section-inner thin animated fadeIn faster">
+		<p>&copy; 2022 <a href="https://mdanilor.github.io">Danilo &#34;mdanilor&#34; Rodrigues</a> &#183; <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a></p>
+		<p>
+			Made with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> &#183; Theme <a href="https://github.com/Track3/hermit" target="_blank" rel="noopener">Hermit</a> &#183; <a href="https://mdanilor.github.io/posts/index.xml" target="_blank" title="rss"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-rss"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg></a>
+		</p>
+	</footer>
+
+
+
+	<script src="https://mdanilor.github.io/js/bundle.min.4a9a0ac3d2217822c7865b4161e6c2a71de1d70492264337755427898dd718f6.js" integrity="sha256-SpoKw9IheCLHhltBYebCpx3h1wSSJkM3dVQniY3XGPY=" crossorigin="anonymous"></script>
+	
+
+</body>
+
+</html>

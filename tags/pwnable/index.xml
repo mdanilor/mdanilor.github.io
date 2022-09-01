@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>pwnable on Cebola Security</title>
+    <link>https://mdanilor.github.io/tags/pwnable/</link>
+    <description>Recent content in pwnable on Cebola Security</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
+    <lastBuildDate>Fri, 06 Mar 2020 18:01:34 -0300</lastBuildDate>
+    
+	<atom:link href="https://mdanilor.github.io/tags/pwnable/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Pwning a pwnable calc (writeup)</title>
+      <link>https://mdanilor.github.io/posts/calc-writeup/</link>
+      <pubDate>Fri, 06 Mar 2020 18:01:34 -0300</pubDate>
+      
+      <guid>https://mdanilor.github.io/posts/calc-writeup/</guid>
+      <description>Hi! A friend of mine presented me a website with several linux binaries waiting to be exploited. At the time he told me they were very difficult. I found that to actually be an understatement. Even the first challenge on pwnable.tw (which is supposed to be just a hello, binexp) required a lot of thinking to me. If you are into binary exploitation and already have some experience, I very much recommend that you give it a try.</description>
+    </item>
+    
+  </channel>
+</rss>
