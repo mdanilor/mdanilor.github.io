@@ -7,10 +7,21 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
-    <lastBuildDate>Thu, 24 Sep 2020 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Thu, 01 Sep 2022 00:00:00 +0000</lastBuildDate>
     
 	<atom:link href="https://mdanilor.github.io/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>About Cebola</title>
+      <link>https://mdanilor.github.io/about-hugo/</link>
+      <pubDate>Thu, 01 Sep 2022 00:00:00 +0000</pubDate>
+      
+      <guid>https://mdanilor.github.io/about-hugo/</guid>
+      <description>$ whoami Senior software security analyst and tech leader at SiDi.
+I created this blog to post about the stuff I&amp;rsquo;m currently learning about, personal research, thoughts and other random stuff. My interests include:
+ Privacy Free and open source software Web application hacking Android security Binary exploitation Kernel exploitation Active directory hacking  You may contact me at mdanilor@protonmail.com</description>
+    </item>
     
     <item>
       <title>[Cracking Windows Kernel with HEVD] Chapter 0: Where do I start?</title>
@@ -39,17 +50,6 @@ Memory corruption issues often lead to pretty serious vulnerabilities. It is not
       
       <guid>https://mdanilor.github.io/posts/oscp-bof/</guid>
       <description>So my OSCP PWK lab starts next saturday. Throughout the last few months, I&amp;rsquo;ve been slowly preparing myself to start the lab. Solved dozens of CTF VMs on vulnhub and tryhackme. One VM that particularly caught my attention is hosted on TryHackMe, a brilliant platform for security enthusiasts and professionals to practice their skills. This VM is Buffer Overflow Prep, which, according to friends who have taken the exam, it&amp;rsquo;s pretty close to the OSCP exam BoF machine.</description>
-    </item>
-    
-    <item>
-      <title>About Cebola</title>
-      <link>https://mdanilor.github.io/about-hugo/</link>
-      <pubDate>Thu, 24 Sep 2020 00:00:00 +0000</pubDate>
-      
-      <guid>https://mdanilor.github.io/about-hugo/</guid>
-      <description>$ whoami Software security analyst and tech leader at SiDi.
-I created this blog to post about the stuff I&amp;rsquo;m currently learning about, personal research, thoughts and other random stuff. My interests include:
- Privacy Free and open source software Web application hacking Android security Binary exploitation Kernel exploitation Active directory hacking  You may contact me at mdanilor@protonmail.com</description>
     </item>
     
     <item>
