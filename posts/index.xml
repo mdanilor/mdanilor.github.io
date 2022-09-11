@@ -283,7 +283,7 @@ sc start HEVD
 <p>To validate that it works, stop and start HEVD. If you see the debug messages, everything is all set!</p>
 <p><img src="/posts/kernel2-img/6-allset.png" alt=""></p>
 <p>The environment is done! You may now debug your kernel. Try out a few experiments! Pause it. Put breakpoints. The sky is the limit.</p>
-<p>On the next part we will analyze the vulnerable driver and start exploiting it. See you then!!</p>
+<p><a href="/posts/hevd-1">On the next part</a> we will analyze the vulnerable driver and start exploiting it. See you then!!</p>
 ]]></content>
 		</item>
 		
