@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<meta name="theme-color" content="#ffffff">
+	<meta name="msapplication-TileColor" content="#ffffff">
+<meta itemprop="name" content="[Writeup] My take on d3guard, a UEFI CTF">
+<meta itemprop="description" content="Cracking d3guard challenge, a UEFI CTF.">
+<meta itemprop="datePublished" content="2022-08-29T13:08:50-03:00" />
+<meta itemprop="dateModified" content="2022-08-29T13:08:50-03:00" />
+<meta itemprop="wordCount" content="1931">
+
+
+
+<meta itemprop="keywords" content="d3,d3guard,ctf,writeup,binary,exploitation,heap,overflow," /><meta property="og:title" content="[Writeup] My take on d3guard, a UEFI CTF" />
+<meta property="og:description" content="Cracking d3guard challenge, a UEFI CTF." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://mdanilor.github.io/posts/d3guard/" />
+<meta property="article:published_time" content="2022-08-29T13:08:50-03:00" />
+<meta property="article:modified_time" content="2022-08-29T13:08:50-03:00" />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="[Writeup] My take on d3guard, a UEFI CTF"/>
+<meta name="twitter:description" content="Cracking d3guard challenge, a UEFI CTF."/>
+
+	<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+	<link rel="manifest" href="/site.webmanifest">
+	<link rel="mask-icon" href="/safari-pinned-tab.svg" color="">
+	<link rel="shortcut icon" href="/favicon.ico">
+
+	<title>[Writeup] My take on d3guard, a UEFI CTF</title>
+	<link rel="stylesheet" href="https://mdanilor.github.io/css/style.min.eac77496566fd7d5768fd650ddb0b2b181ca6a2d7c5fdd6fe6b8ba4bf47e566f.css" integrity="sha256-6sd0llZv19V2j9ZQ3bCysYHKai18X91v5ri6S/R+Vm8=" crossorigin="anonymous">
+	
+</head>
+
+<body id="page">
+	
+	<header id="site-header" class="animated slideInUp">
+		<div class="hdr-wrapper section-inner">
+			<div class="hdr-left">
+				<div class="site-branding">
+					<a href="https://mdanilor.github.io">Cebola Security</a>
+				</div>
+				<nav class="site-nav hide-in-mobile">
+					
+				<a href="https://mdanilor.github.io/posts/">Posts</a>
+				<a href="https://mdanilor.github.io/about-hugo/">About</a>
+
+				</nav>
+			</div>
+			<div class="hdr-right hdr-icons">
+				<span class="hdr-social hide-in-mobile"><a href="https://github.com/mdanilor" target="_blank" rel="noopener me" title="Github"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg></a></span><button id="menu-btn" class="hdr-btn" title="Menu"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+			</div>
+		</div>
+	</header>
+	<div id="mobile-menu" class="animated fast">
+		<ul>
+			<li><a href="https://mdanilor.github.io/posts/">Posts</a></li>
+			<li><a href="https://mdanilor.github.io/about-hugo/">About</a></li>
+		</ul>
+	</div>
+
+
+	<main class="site-main section-inner animated fadeIn faster">
+		<article class="thin">
+			<header class="post-header">
+				<div class="post-meta"><span>Aug 29, 2022</span></div>
+				<h1>[Writeup] My take on d3guard, a UEFI CTF</h1>
+			</header>
+			<div class="content">
+				<h2 id="about-the-challenge">About the challenge<a href="#about-the-challenge" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
+<p>d3ctf was a Chinese CTF which occurred a few months ago. I did not participate, but I was looking for CTFs on UEFI firmware exploitation and I found <a href="https://github.com/yikesoftware/d3ctf-2022-pwn-d3guard">d3guard</a>: a challenge from this CTF which was exactly what I was looking for.</p>
+<p>I would like to start stating that I found this challenge to be extremely difficult. In fact, it was one of the hardest I have done so far. Not that this means too much, as I am still a learner in binary exploitation.</p>
+<p>I haven&rsquo;t found any writeups for this challenge except for the <a href="https://ctftime.org/writeup/32426">official one</a>, which, in my opinion, lacks some explanation. For that reason, I decided to do my own. Here it goes!</p>
+<h2 id="setting-things-up">Setting things up<a href="#setting-things-up" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
+<p>Before we dive into this challenge, let us check a few things out and do some setups.</p>
+<p>First, let us observe the content inside the challenge&rsquo;s repository:</p>
+<pre><code>$ ls -lRh
+.:
+total 9,6M
+drwxrwxr-x 2 danilo danilo 4,0K set  4 16:41  contents
+-rwxrwxr-x 1 danilo danilo 6,5K set  4 16:41  exp.py
+-rw-rw-r-- 1 danilo danilo 4,0M set  4 16:41  OVMF.fd
+-rw-rw-r-- 1 danilo danilo 4,0M set  4 16:41  OVMF.fd.bak
+-rw-rw-r-- 1 danilo danilo  922 set  4 16:41  README.md
+-rw-rw-r-- 1 danilo danilo  561 set  4 16:41  run.py
+-rw-rw-r-- 1 danilo danilo 131K set  4 16:41  UiApp
+-rw-rw-r-- 1 danilo danilo 1,4M set  4 16:41  UiApp.i64
+-rw-rw-r-- 1 danilo danilo 7,2K set  4 16:41 'writeup en-US.md'
+-rw-rw-r-- 1 danilo danilo 6,3K set  4 16:41 'writeup zh-cn.md'
+
+./contents:
+total 13M
+-rw-rw-r-- 1 danilo danilo   77 set  4 16:41 boot.nsh
+-rwxrwxr-x 1 danilo danilo  10M set  4 16:41 bzImage
+-rw-rw-r-- 1 danilo danilo 2,7M set  4 16:41 rootfs.img
+-rw-rw-r-- 1 danilo danilo   45 set  4 16:41 startup.nsh
+</code></pre><p>Inside the repository for the challenge we may see some interesting files. There are the official writeups, one in Chinese and another in English, and the official exploit resolution (exp.py).</p>
+<p>There is an OVMF.fd and OVMF.fd.bak. OVMF.fd is the boot firmware.</p>
+<p>We may also see UiApp and UiApp.i64. UiApp is commonly the name of the user interface that is prompted after the reset, before loading the operating system.</p>
+<p>Inside contents folder, a Linux image (bzImage) may be observed, as well as the root file system (rootfs.img) and two EFI shell script files (boot.nsh and startup.nsh). Both scripts are used for booting Linux.</p>
+<pre><code>$ cat contents/boot.nsh 
+echo &quot;Booting...&quot;
+bzImage console=ttyS0 initrd=rootfs.img rdinit=/init quiet
+$ cat contents/startup.nsh 
+@echo -off
+cls
+boot.nsh
+reset -s &quot;Shutdown!&quot;
+</code></pre><p>Another interesting file at which we should take a glance is run.py:</p>
+<pre><code>$ cat run.py
+import os, subprocess
+import random
+
+def main():
+    try:
+        ret = subprocess.call([
+            &quot;qemu-system-x86_64&quot;,
+            &quot;-m&quot;, f&quot;{256+random.randint(0, 512)}&quot;,
+            &quot;-drive&quot;, f&quot;if=pflash,format=raw,file=OVMF.fd&quot;,
+            &quot;-drive&quot;, &quot;file=fat:rw:contents,format=raw&quot;,
+            &quot;-net&quot;, &quot;none&quot;,
+            &quot;-monitor&quot;, &quot;/dev/null&quot;,
+            &quot;-nographic&quot;
+        ], stderr=subprocess.DEVNULL)
+        print(&quot;Return:&quot;, ret)
+    except:
+        print(&quot;Error!&quot;)
+    finally:
+        print(&quot;Done.&quot;)
+
+if __name__ == &quot;__main__&quot;:
+    main()
+</code></pre><p>This runs the challenge on QEMU. A very important parameter for us today is <code>-m</code>. This indicates the amount of RAM available to the emulated system. It may vary from 256 and 768, taking any random value inside this range. It was likely implemented this way to simulate some sort of ASLR, as changing the memory size will certainly cause alterations on the memory layout.</p>
+<p>For now, I will disable this <em>ASLRish</em> feature and will create my own script to run qemu:</p>
+<pre><code>$ cat run_qemu.sh 
+#!/bin/sh
+
+qemu-system-x86_64 -m 768M -drive if=pflash,format=raw,file=OVMF.fd -drive file=fat:rw:contents,format=raw -net none -nographic -monitor /dev/null -gdb tcp:localhost:1234 -S
+</code></pre><p>I added <code>-gdb</code> and <code>-S</code> args. The former will open a gdb server on port 1234 and the latter will force qemu to wait until gdb is attached and a <code>continue</code> command is prompted to start.</p>
+<p>We then fire up our gdb and run our start up script:</p>
+<p><img src="/posts/d3guard/0-gdb.png" alt=""></p>
+<p>On gdb, we put <code>target remote :1234</code>. It will attach to qemu. We then must send a continue command to get the ctf started.</p>
+<p>The CTF soon boots a Linux machine.</p>
+<p><img src="/posts/d3guard/1-cantopenflag.png" alt=""></p>
+<p>Ok. I restart the ctf and quickly press <code>esc</code> key before boot.</p>
+<p><img src="/posts/d3guard/2-uiapp.png" alt=""></p>
+<p>We see this interface. Remember the UiApp we have seen earlier? This is it.</p>
+<p>Inspecting the administrator menu, we are asked for a username:</p>
+<p><img src="/posts/d3guard/3-adminmenu.png" alt=""></p>
+<p>The username is reflected into the message: &ldquo;User [admin] not found!!&quot;. Maybe there is a format string vulnerability?</p>
+<p><img src="/posts/d3guard/4-formatstring.png" alt=""></p>
+<p>Bingo!</p>
+<p>One might suggest, as a possible path for exploitation, to use this format string bug to write data to a pointer. Such exploitation technique may be observed <a href="https://owasp.org/www-community/attacks/Format_string_attack">in this link</a>. However, this technique is no good here. The edk2 (base firmware implementation) <a href="https://github.com/tianocore/edk2-test/blob/master/uefi-sct/SctPkg/SCRT/SCRTDriver/Print.c">source code</a> shows us that <code>%n</code> type is not present in this implementation of printf.</p>
+<p>Nonetheless, we will still use this vulnerability for memory leaks. Keep in mind we will still need to bypass ASLR.</p>
+<p>Let&rsquo;s check the visitor menu:</p>
+<p><img src="/posts/d3guard/5-visitormenu-home.png" alt=""></p>
+<p>We may insert a new visitor:</p>
+<p><img src="/posts/d3guard/6-visitormenu-new.png" alt=""></p>
+<p>Or edit existing visitor:</p>
+<p><img src="/posts/d3guard/7-visitormenu-edit.png" alt=""></p>
+<p>We can also clear info or confirm and enter OS, which will lead us to the same Linux as we entered before.</p>
+<h2 id="reverse-engineering-the-ctf-and-finding-our-vulnerability">Reverse engineering the CTF and finding our vulnerability<a href="#reverse-engineering-the-ctf-and-finding-our-vulnerability" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
+<p>Allright. Let us do some reverse engineering. I will use IDA Pro for this, but ghidra would do the trick just fine as well. First let us take a look at the program&rsquo;s strings:</p>
+<p><img src="/posts/d3guard/8-idastrings.png" alt=""></p>
+<p>We have seen these strings before! Let us see where it is used:</p>
+<p><img src="/posts/d3guard/9-idastrings-graph.png" alt=""></p>
+<p><img src="/posts/d3guard/10-idastrings-code.png" alt=""></p>
+<p>Found the code! Now we must do some code review&hellip;</p>
+<p>After spending a few hours looking at the decompiled code, it is possible to find an overflow vulnerability in the edit visitor function:</p>
+<p><img src="/posts/d3guard/11-pooloverflow.png" alt=""></p>
+<p>Before we dive into the code above, some things must be clarified. I renamed a few functions and a data structure on my IDA to facilitate our comprehension.</p>
+<p><code>STRUCT_VISITOR</code> is the structure which will store visitor data. More specifically, the visitor id, name and description. The id is an integer type. Name and description, on the other hand, are byte arrays. On <code>STRUCT_VISITOR</code>, only the pointers to name and description are stored, as well as the value of the id. It looks something like this:</p>
+<pre><code>typedef struct {
+	int id;
+	char *name;
+	char *description;
+} STRUCT_VISITOR;
+</code></pre><p>When you see <code>STRUCT_VISITOR + 8</code> at the pseudocode, read it as <code>STRUCT_VISITOR-&gt;name</code>. Similarly, <code>STRUCT_VISITOR + 16</code> is equivalent to <code>STRUCT_VISITOR-&gt;description</code>.</p>
+<p>Now, looking at the pseudocode, we see, on <code>(I)</code>, a sanity check to verify if there is a name allocated. The same is done with description. If none is allocated, we may observe on <code>(II)</code> and <code>(III)</code> 24 and 56 bytes being allocated to name and description, respectively. On <code>(IV)</code>, just after a read of arbitrary size (on <code>sub_611()</code>) is performed. The data read from the user keyboard will then be copied to the description buffer in <code>(V)</code>, but notice in <code>(IV)</code> that the size provided is 128, larger than the 56 bytes shown in <code>(III)</code>.</p>
+<p>Summarizing, on edit visitor functionality, a 56-byte long buffer is allocated to description, but 128 bytes are being copied. There is our pool overflow.</p>
+<h2 id="edk2-allocator">EDK2 allocator<a href="#edk2-allocator" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
+<p>We must understand how EDK2 allocator works in order to exploit this pool overflow. We will now take a break from the CTF and focus on the UEFI memory allocator. This piece of the puzzle will be very important to solve this challenge later on.</p>
+<p>Be advised that many aspects of the allocator will be simplified here. Other parts may be overlooked. For a detailed understanding of EDK2 allocator, you may check the <a href="https://github.com/tianocore/edk2/blob/master/MdeModulePkg/Core/Dxe/Mem/Pool.c">source code</a> or <a href="https://laurie0131.gitbooks.io/atbb-mitigate-buffer-overflow-in-uefi/content/additional_overflow_detection/heap_management_in_edkii.html">this brilliant gitbook</a>.</p>
+<h3 id="types-of-memory-allocation">Types of memory allocation<a href="#types-of-memory-allocation" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>Free memory chunks are divided into a few categories according to their type and size. Chunks can be one of 15 memory types, which we will not see in depth here. Just be advised that there are different memory types and chunks of same type and size are stored together, in the same list.</p>
+<p>The size is also important for clustering free chunks. Free chunks are divided by memory types, but also by indexes. Available sizes for allocation are 128, 256, 384, 640, 1024, 1664, 2688, 4352, 7040, 11392, 18432 and 29824. This size includes an overhead of 40 bytes, necessary to maintain the chunk. Chunks of size 128 and memory type 1 (EfiLoaderCode), for instance, are stored in the same list.</p>
+<h3 id="how-free-chunks-are-stored">How free chunks are stored<a href="#how-free-chunks-are-stored" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p><img src="/posts/d3guard/12-pool-organization.png" alt=""></p>
+<p>Each memory type has a Pool Head, which contains a vector of <code>FreeList</code> with as many elements as there are indexes. Each element of this vector points to a double-linked list of free chunks of that index (or size).</p>
+<p>Ok. Very tricky. Summarizing: for each memory type there is a PoolHead structure, containing 12 free lists, organized as a vector. The N-th element of this vector will point to a double-linked list of free chunks. The size of these free chunks will depend on N. If N is 0, then the chunk size is 128.</p>
+<p>There is also a 40-byte overhead for each chunk. Say a developer tries to allocate 100 bytes. The developer will receive a chunk of index 1, not 0, as <code>100 + 40 = 140</code>, and <code>128 &lt; 140 &lt; 256</code>.</p>
+<p>Below you may see the pool head structure:</p>
+<pre><code>typedef struct {
+  INTN               Signature;
+  UINTN              Used;
+  EFI_MEMORY_TYPE    MemoryType;
+  LIST_ENTRY         FreeList[MAX_POOL_LIST];
+  LIST_ENTRY         Link;
+} POOL;
+</code></pre><p>You may observe above that <code>LIST_ENTRY</code> is the linked list. Below you may find its definition:</p>
+<pre><code>typedef struct _LIST_ENTRY LIST_ENTRY;
+//...
+struct _LIST_ENTRY {
+  LIST_ENTRY    *ForwardLink;
+  LIST_ENTRY    *BackLink;
+};
+</code></pre><p>It is used by <code>POOL_FREE</code> struct to make it a double-linked list:</p>
+<pre><code>typedef struct {
+  UINT32        Signature;
+  UINT32        Index;
+  LIST_ENTRY    Link;
+} POOL_FREE;
+</code></pre><h3 id="life-and-death-of-a-chunk">Life and death of a chunk<a href="#life-and-death-of-a-chunk" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>When a chunk is requested for allocation, the algorithm will first find the POOL structure that matches the memory type requested by the developer. Next, it will find the free list index which size is the smallest that will fit the requested size.</p>
+<p>Allocated chunks will have a <code>POOL_HEAD</code> and a <code>POOL_TAIL</code>. These are the definitions:</p>
+<pre><code>typedef struct {
+  UINT32             Signature;
+  UINT32             Reserved;
+  EFI_MEMORY_TYPE    Type;
+  UINTN              Size;
+  CHAR8              Data[1];
+} POOL_HEAD;
+
+(...)
+
+typedef struct {
+  UINT32    Signature;
+  UINT32    Reserved;
+  UINTN     Size;
+} POOL_TAIL;
+</code></pre><p>Upon memory liberation, the allocation algorithm will perform several sanity checks. For instance, the signatures of <code>POOL_HEAD</code> and <code>POOL_TAIL</code> will be checked. After sanity checks are done, it will fill the chunk with garbage and put it at the top of the corresponding free list (LIFO).</p>
+<h3 id="exploiting-an-overflow">Exploiting an overflow<a href="#exploiting-an-overflow" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>The last sentence from the paragraph above is very important. The freed chunk will be added to the top of the corresponding free list. Going back to <code>LIST_ENTRY</code> struct and <code>POOL_FREE</code> struct, we have something like this in memory:</p>
+<pre><code>┌─────────────┐
+│  Signature  │
+├─────────────┤
+│    Index    │
+├─────────────┤
+│*ForwardLink │
+├─────────────┤
+│  *BackLink  │
+└─────────────┘
+</code></pre><p>If we can overwrite ForwardLink and BackLink to arbitrary values by abusing a pool overflow, we get a write-what-where primitive when this chunk gets allocated again.
+That happens because, upon allocation, the algorithm must delete this entry from the double-linked list. To do so, the function <code>RemoveEntryList (&amp;Free-&gt;Link);</code> is called. If we look at its implementation:</p>
+<pre><code>LIST_ENTRY *EFIAPI RemoveEntryList (IN CONST LIST_ENTRY  *Entry)
+{
+  ASSERT (!IsListEmpty (Entry));
+
+  Entry-&gt;ForwardLink-&gt;BackLink = Entry-&gt;BackLink;
+  Entry-&gt;BackLink-&gt;ForwardLink = Entry-&gt;ForwardLink;
+  return Entry-&gt;ForwardLink;
+}
+</code></pre><p>From the implementation, we can see clearly the write-what-where primitive. If we put the <strong>WHAT</strong> value in ForwardLink and the <strong>WHERE</strong> value in BackLink, the primitive will be executed as soon as this chunk gets allocated.</p>
+<h2 id="memory-layout">Memory layout<a href="#memory-layout" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
+<p>We have a few pieces to our puzzle here:</p>
+<pre><code>* A pointer leak;
+* A pool overflow;
+* A strategy for turning a pool overflow into an arbitrary memory write.
+</code></pre>
+<p>But a few important pieces are missing:</p>
+<pre><code>* How is the memory organized? Can we actually get the scenario described in the previous section? 
+* If we achieve the write-what-where primitive, what would we write? And where?
+</code></pre>
+
+			</div>
+			<hr class="post-end">
+			<footer class="post-info">
+				<p>
+					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-tag meta-icon"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7" y2="7"></line></svg><span class="tag"><a href="https://mdanilor.github.io/tags/d3">d3</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/d3guard">d3guard</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/ctf">ctf</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/writeup">writeup</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/binary">binary</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/exploitation">exploitation</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/heap">heap</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/overflow">overflow</a></span>
+				</p>
+				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>1931 Words</p>
+				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-calendar"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>2022-08-29 13:08 -0300</p>
+			</footer>
+		</article>
+		<div class="post-nav thin">
+			<a class="next-post" href="https://mdanilor.github.io/posts/hevd-0/">
+				<span class="post-nav-label"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-left"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>&nbsp;Newer</span><br><span>[Cracking Windows Kernel with HEVD] Chapter 0: Where do I start?</span>
+			</a>
+			<a class="prev-post" href="https://mdanilor.github.io/posts/memory-protections/">
+				<span class="post-nav-label">Older&nbsp;<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></span><br><span>Understanding binary protections (and how to bypass) with a dumb example</span>
+			</a>
+		</div>
+		<div id="comments" class="thin">
+</div>
+	</main>
+
+	<footer id="site-footer" class="section-inner thin animated fadeIn faster">
+		<p>&copy; 2022 <a href="https://mdanilor.github.io">Danilo &#34;mdanilor&#34; Rodrigues</a> &#183; <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a></p>
+		<p>
+			Made with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> &#183; Theme <a href="https://github.com/Track3/hermit" target="_blank" rel="noopener">Hermit</a> &#183; <a href="https://mdanilor.github.io/posts/index.xml" target="_blank" title="rss"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-rss"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg></a>
+		</p>
+	</footer>
+
+
+
+	<script src="https://mdanilor.github.io/js/bundle.min.4a9a0ac3d2217822c7865b4161e6c2a71de1d70492264337755427898dd718f6.js" integrity="sha256-SpoKw9IheCLHhltBYebCpx3h1wSSJkM3dVQniY3XGPY=" crossorigin="anonymous"></script>
+	
+
+</body>
+
+</html>

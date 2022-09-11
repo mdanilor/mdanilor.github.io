@@ -7,10 +7,20 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
-    <lastBuildDate>Mon, 29 Aug 2022 13:08:50 -0300</lastBuildDate>
+    <lastBuildDate>Sun, 11 Sep 2022 00:00:50 -0300</lastBuildDate>
     
 	<atom:link href="https://mdanilor.github.io/tags/hevd/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>[Cracking Windows Kernel with HEVD] Chapter 1: Will this driver ever crash?</title>
+      <link>https://mdanilor.github.io/posts/hevd-1/</link>
+      <pubDate>Sun, 11 Sep 2022 00:00:50 -0300</pubDate>
+      
+      <guid>https://mdanilor.github.io/posts/hevd-1/</guid>
+      <description>Cracking HackSys Extreme Vulnerable Driver: will this driver ever crash? Writing a BSOD crash Last time we focused on setting up the environment. This time we will try to understand the vulnerability and make our system crash! Let&amp;rsquo;s dive in!
+The vulnerable code (...) ULONG KernelBuffer[BUFFER_SIZE] = { 0 }; (...) // Verify if the buffer resides in user mode ProbeForRead(UserBuffer, sizeof(KernelBuffer), (ULONG)__alignof(UCHAR)); DbgPrint(&amp;quot;[+] UserBuffer: 0x%p\n&amp;quot;, UserBuffer); DbgPrint(&amp;quot;[+] UserBuffer Size: 0x%zX\n&amp;quot;, Size); DbgPrint(&amp;quot;[+] KernelBuffer: 0x%p\n&amp;quot;, &amp;amp;KernelBuffer); DbgPrint(&amp;quot;[+] KernelBuffer Size: 0x%zX\n&amp;quot;, sizeof(KernelBuffer)); (.</description>
+    </item>
     
     <item>
       <title>[Cracking Windows Kernel with HEVD] Chapter 0: Where do I start?</title>

