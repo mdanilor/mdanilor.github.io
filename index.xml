@@ -44,16 +44,6 @@ Today we&amp;rsquo;ll be attacking HEVD: HackSys Extreme Vulnerable Driver. This
     </item>
     
     <item>
-      <title>[Writeup] My take on d3guard, a UEFI CTF</title>
-      <link>https://mdanilor.github.io/posts/d3guard/</link>
-      <pubDate>Mon, 29 Aug 2022 13:08:50 -0300</pubDate>
-      
-      <guid>https://mdanilor.github.io/posts/d3guard/</guid>
-      <description>About the challenge d3ctf was a Chinese CTF which occurred a few months ago. I did not participate, but I was looking for CTFs on UEFI firmware exploitation and I found d3guard: a challenge from this CTF which was exactly what I was looking for.
-I would like to start stating that I found this challenge to be extremely difficult. In fact, it was one of the hardest I have done so far.</description>
-    </item>
-    
-    <item>
       <title>Understanding binary protections (and how to bypass) with a dumb example</title>
       <link>https://mdanilor.github.io/posts/memory-protections/</link>
       <pubDate>Mon, 01 Feb 2021 17:30:00 -0300</pubDate>

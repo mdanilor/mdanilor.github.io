@@ -7,20 +7,10 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
-    <lastBuildDate>Mon, 29 Aug 2022 13:08:50 -0300</lastBuildDate>
+    <lastBuildDate>Thu, 24 Sep 2020 18:01:34 -0300</lastBuildDate>
     
 	<atom:link href="https://mdanilor.github.io/tags/writeup/index.xml" rel="self" type="application/rss+xml" />
     
-    
-    <item>
-      <title>[Writeup] My take on d3guard, a UEFI CTF</title>
-      <link>https://mdanilor.github.io/posts/d3guard/</link>
-      <pubDate>Mon, 29 Aug 2022 13:08:50 -0300</pubDate>
-      
-      <guid>https://mdanilor.github.io/posts/d3guard/</guid>
-      <description>About the challenge d3ctf was a Chinese CTF which occurred a few months ago. I did not participate, but I was looking for CTFs on UEFI firmware exploitation and I found d3guard: a challenge from this CTF which was exactly what I was looking for.
-I would like to start stating that I found this challenge to be extremely difficult. In fact, it was one of the hardest I have done so far.</description>
-    </item>
     
     <item>
       <title>Cracking an OSCP-like buffer overflow</title>
