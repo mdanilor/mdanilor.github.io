@@ -801,7 +801,6 @@ End of assembler dump.
 <p><strong>Pros</strong>: very effective against code-reuse attacks (such as return oriented programming).</p>
 <p><strong>Cons</strong>: considerable performance overhead.</p>
 <p><strong>Bypass</strong>: address leak.</p>
-<p><img src="https://komarev.com/ghpvc/?username=mdanilor&amp;label=memoryprotections&amp;color=ce9927&amp;style=flat" alt="mdanilor"></p>
 ]]></content>
 		</item>
 		
@@ -1609,6 +1608,7 @@ sh-5.0# id
 uid=0(root) gid=0(root) groups=0(root)
 </code></pre><h3 id="conclusion">Conclusion</h3>
 <p>We exploited a stack overflow vulnerability with KASLR disabled on Kernel 5.18. We have seen in this post how the kernel stores the task&rsquo;s credentials and one way to change it to escalate privileges. I hope this was a useful example of kernel exploitation for beginners. In future work we will cover how to exploit other vulnerabilities as well as bypassing the KALSR mitigations. Thanks for reading =)</p>
+<p>![Hits](<a href="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fmdanilor.github.io%2Fposts%2Fhello-kernel%2F&amp;count_bg=%2379C83D&amp;title_bg=%23555555&amp;icon=&amp;icon_color=%23E7E7E7&amp;title=hits&amp;edge_flat=false">https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fmdanilor.github.io%2Fposts%2Fhello-kernel%2F&amp;count_bg=%2379C83D&amp;title_bg=%23555555&amp;icon=&amp;icon_color=%23E7E7E7&amp;title=hits&amp;edge_flat=false</a> =1x1)</p>
 ]]></content>
 		</item>
 		
