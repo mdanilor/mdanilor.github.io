@@ -85,7 +85,7 @@
 <p>In this case, we should go with the easier approach and ROP our way to disable the SMEP bit on the CR4 register, right?</p>
 <p>Well, we could try. But nowadays there is another mitigation in place that will make this bypass useless.</p>
 <h4 id="smep-was-our-only-hope-no-there-is-another">SMEP was our only hope. No, there is another.<a href="#smep-was-our-only-hope-no-there-is-another" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h4>
-<p><img src="kernel2-img/14-yoda.webp" alt="">
+<p><img src="/kernel2-img/14-yoda.webp" alt="">
 There is another mitigation called Kernel Page-Table Isolation (KPTI), or, as Windows calls it, Kernel Virtual Address (KVA) Shadow. It was actually created to mitigate Meltdown vulnerabilities by isolating kernel page tables from user page tables. However, it also creates another problem: when executing kernel code, it marks user page tables as non-executable (NX). This breaks down our easy approach to just disable SMEP by ropping.</p>
 <p>Now we can either mark user pages as executable again or use a writable and executable kernel page to store our shellcode. The latter approach will be used here.</p>
 <p>With this approach, we don&rsquo;t have to be concerned about SMEP at all, as we will just avoid it. But this raises yet another question: is there such a place in kernel where we can write our shellcode and execute it?</p>
