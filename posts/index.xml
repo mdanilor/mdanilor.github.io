@@ -6,8 +6,93 @@
 		<generator>Hugo -- gohugo.io</generator>
 		<language>en-us</language>
 		<copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
-		<lastBuildDate>Sun, 11 Sep 2022 00:00:50 -0300</lastBuildDate>
+		<lastBuildDate>Tue, 29 Nov 2022 00:00:00 -0300</lastBuildDate>
 		<atom:link href="https://mdanilor.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
+		
+		<item>
+			<title>[Cracking Windows Kernel with HEVD] Chapter 2: Is there a way to bypass kASLR, SMEP and KVA Shadow?</title>
+			<link>https://mdanilor.github.io/posts/hevd-2/</link>
+			<pubDate>Tue, 29 Nov 2022 00:00:00 -0300</pubDate>
+			
+			<guid>https://mdanilor.github.io/posts/hevd-2/</guid>
+			<description>##Cracking HackSys Extreme Vulnerable Driver: Is there a way to bypass kASLR, SMEP and KVA Shadow?
+Where to redirect the execution flow? On the previous post, we wrote a program that would crash our driver and leave us with a BSOD. We managed to discover the return address offset and redirect the program flow to an arbitrary address. But we were left with a question: what now? Where to redirect the execution flow?</description>
+			<content type="html"><![CDATA[<p>##Cracking HackSys Extreme Vulnerable Driver: Is there a way to bypass kASLR, SMEP and KVA Shadow?</p>
+<h3 id="where-to-redirect-the-execution-flow">Where to redirect the execution flow?</h3>
+<p>On the <a href="/posts/hevd-1">previous post</a>, we wrote a program that would crash our driver and leave us with a BSOD. We managed to discover the return address offset and redirect the program flow to an arbitrary address. But we were left with a question: what now? Where to redirect the execution flow?</p>
+<p>The first naive approach that would come to mind is to create a userland function in our exploit and redirect the control flow to that function. This approach was fine until Windows 7 SP1 launched (I believe it was on Windows 7 SPI, but I might be mistaken on this one. Could not find sources on the Internet to back this up). However, from this point onwards Supervisor Mode Execution Prevention was enabled in processor which has support for it.</p>
+<h4 id="wtf-is-supervisor-mode-execition-prevention">WTF is Supervisor Mode Execition Prevention?</h4>
+<p>Ok, but first what is supervisor mode anyways?</p>
+<p><a href="https://en.wikipedia.org/wiki/Protection_ring#SUPERVISOR-MODE">Supervisor mode</a> is an execution mode which enables all instructions, including privileged ones. It gives access to different address spaces, memory management hardware and other peripherals. This is the mode in which the kernel, and its drivers, run. It is basically a &ldquo;god mode&rdquo; in which the kernel runs, but not userland programs.</p>
+<p>So the Supervisor Mode Execution Prevention is a mitigation that will not permit certain regions of memory (such as userland memory) to be executed in supervisor mode. In terms of our exploit, if we redirect the execution flow to our program in userland, it will raise a trap and you will immediately get a BSOD.</p>
+<p>This mitigation can be disabled (almost trivially on Windows, if I might say so) by setting the 20th bit of CR4 register to zero. This can be achieved in kernel land with a ROP chain. In this case, we can bypass SMEP by using a ROP chain, for instance.</p>
+<p>We can also bypass SMEP by never going to userland in the first place. We can use ROP gadgets in the kernel to perform elevation of privileges or write our shellcode to a memory region in the kernel which is both executable and writable. This approach is usually harder than the former.</p>
+<p>In this case, we should go with the easier approach and ROP our way to disable the SMEP bit on the CR4 register, right?</p>
+<p>Well, we could try. But nowadays there is another mitigation in place that will make this bypass useless.</p>
+<h4 id="smep-was-our-only-hope-no-there-is-another">SMEP was our only hope. No, there is another.</h4>
+<p><img src="kernel2-img/14-yoda.webp" alt="">
+There is another mitigation called Kernel Page-Table Isolation (KPTI), or, as Windows calls it, Kernel Virtual Address (KVA) Shadow. It was actually created to mitigate Meltdown vulnerabilities by isolating kernel page tables from user page tables. However, it also creates another problem: when executing kernel code, it marks user page tables as non-executable (NX). This breaks down our easy approach to just disable SMEP by ropping.</p>
+<p>Now we can either mark user pages as executable again or use a writable and executable kernel page to store our shellcode. The latter approach will be used here.</p>
+<p>With this approach, we don&rsquo;t have to be concerned about SMEP at all, as we will just avoid it. But this raises yet another question: is there such a place in kernel where we can write our shellcode and execute it?</p>
+<h4 id="allocating-an-executable-pool">Allocating an executable pool</h4>
+<p>Driver developers can allocate different types of memory pools. The two most basic types are PagedPool and NonPagedPool types. The former allocated a non-executable pageable memory pool for use, whereas the latter allocates non-pageable pool which, by default, is executable. The allocation can be performed by calling <a href="https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-exallocatepoolwithtag">ExAllocatePoolWithTag()</a> function with the desired parameters.</p>
+<p>We shall use this function to allocate an executable NonPagedPool. Then we write our shellcode to this allocated region and execute it. Finally, we restore enough registers so the system can return to userland gracefully and that&rsquo;s a wrap.</p>
+<p>The <code>ExAllocatePoolWithTag()</code> has the following prototype:</p>
+<pre><code>PVOID ExAllocatePoolWithTag(
+  [in] __drv_strictTypeMatch(__drv_typeExpr)POOL_TYPE PoolType,
+  [in] SIZE_T                                         NumberOfBytes,
+  [in] ULONG                                          Tag
+);
+</code></pre><p>The first parameter is the pool type, which is zero (NonPagedPool), as can be checked in the <a href="https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_pool_type">official Microsoft documentation</a>. The second parameter is the size, which we can just use 4096 bytes. Finally, the Tag parameter is just for debugging purposes. We can put whatever we want in it.</p>
+<p>It will return the address of the allocated pool.</p>
+<p>According to <a href="https://docs.microsoft.com/en-us/cpp/build/x64-calling-convention?view=msvc-170">Microsoft documentation</a>, the call convention dictates that the first parameter is given in <code>rcx</code> register, the second in <code>rdx</code> and the third in <code>r8</code>. We shall ROP our way to set up <code>rcx</code> to zero, <code>rdx</code> to 4096 and call this function. The address allocated will be returned in <code>rax</code> register, as it is also dictated by the call convention.</p>
+<p>After it is allocated, we can use <code>RtlCopyMemory</code> to copy our shellcode from userland to the executable address in the kernel land. Finally, we can use some gadget, such as <code>jmp rax</code> to redirect the execution flow.</p>
+<p>Once again, this approach raises another problem. We must have the address of <code>ExAllocatePoolWithTag</code> and <code>RtlCopyMemory</code> (or an analogue memory copy function) to know where to redirect our flow. We could get the address for these functions on the ntoskrnl.exe (which is actually the kernel program), but the imagebase is changed upon each reboot. This means that on every reboot, every kernel function will be added to an offset, the imagebase offset, making the addresses unpredictable. Our approach will rely on getting the addresses for the desired functions (and eventual gadgets) in the ntoskrnl.exe binary and somehow leak the imagebase address to defeat the protection.</p>
+<h4 id="defeating-the-randomized-imagebase">Defeating the randomized imagebase</h4>
+<p>This sounds like a really hard problem to solve that would rely on leaking a kernel address and then try to guess the imagebase with that. And this problem is usually hard to solve. But Windows makes it easier for us!</p>
+<p>For processes running with medium integrity level (which is the default level when you open applications), there are Windows APIs which will give that away for free. Microsoft even gives us <a href="https://docs.microsoft.com/en-us/windows/win32/psapi/enumerating-all-device-drivers-in-the-system">an example</a> of how to implement this.</p>
+<p>The <code>EnumDeviceDrivers</code> function, present on <code>psapi.h</code>, will enumerate all device drivers, including the kernel itself, and give us the base address for the device driver. It will return a list of device drivers, the first of which being the kernel itself. The implementation is very simple:</p>
+<pre><code>#include &lt;Windows.h&gt;
+#include &lt;Psapi.h&gt;
+...
+unsigned long long get_kernel_base_addr() {
+	LPVOID drivers[1024];
+	DWORD cbNeeded;
+
+	EnumDeviceDrivers(drivers, sizeof(drivers), &amp;cbNeeded);
+
+	return (unsigned long long)drivers[0];
+}
+
+</code></pre><p>There we go! The randomized imagebase is now defeated.</p>
+<p>It is also useful to be able to get any kernel function address by the function name. This is done by opening the kernel binary as a library and looking up the address for the desired symbol. The implementation is very straightforward as well:</p>
+<pre><code>PVOID get_kernel_symbol_addr(const char *symbol) {
+	PVOID kernelBaseAddr;
+	HMODULE userKernelHandle;
+	PCHAR functionAddress;
+	unsigned long long offset;
+
+	kernelBaseAddr = (PVOID)get_kernel_base_addr();  // Get base address from our previously implemented function
+	userKernelHandle = LoadLibraryA(&quot;C:\\Windows\\System32\\ntoskrnl.exe&quot;);  // Loads the kernel binary as a lib
+
+	if (userKernelHandle == INVALID_HANDLE_VALUE) {
+		// Something went wrong
+		return NULL;
+	}
+
+	functionAddress = (PCHAR)GetProcAddress(userKernelHandle, symbol);  // Finds the address of the specified symbol
+	if (functionAddress == NULL) {
+		// Something went wrong
+		return NULL;
+	}
+
+	offset = functionAddress - ((PCHAR)userKernelHandle);  // Subtracts the address found for the symbol to the base address of the lib loaded in the process memory
+	return (PVOID)(((PCHAR)kernelBaseAddr) + offset);  // Adds the offset of the leaked kernel base address
+}
+</code></pre><p>With the function above, we can query the address of any kernel function. Neat!</p>
+<p>I am afraid that is as far as we are going to get today, folks. On the next post we will craft our ROP payload. See you then!</p>
+]]></content>
+		</item>
 		
 		<item>
 			<title>[Cracking Windows Kernel with HEVD] Chapter 1: Will this driver ever crash?</title>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<meta name="theme-color" content="#ffffff">
+	<meta name="msapplication-TileColor" content="#ffffff">
+<meta itemprop="name" content="[Cracking Windows Kernel with HEVD] Chapter 2: Is there a way to bypass kASLR, SMEP and KVA Shadow?">
+<meta itemprop="description" content="A beginers guide into a Windows kernel stack overflow vulnerability from zero to advanced bypasses.">
+<meta itemprop="datePublished" content="2022-11-29T00:00:00-03:00" />
+<meta itemprop="dateModified" content="2022-11-29T00:00:00-03:00" />
+<meta itemprop="wordCount" content="1300">
+
+
+
+<meta itemprop="keywords" content="windows,kernel,exploit,stack,overflow,hevd,HEVD,hacksys,extreme,vulnerable,driver,exploitation,smep,kpti,bypass,sysret," /><meta property="og:title" content="[Cracking Windows Kernel with HEVD] Chapter 2: Is there a way to bypass kASLR, SMEP and KVA Shadow?" />
+<meta property="og:description" content="A beginers guide into a Windows kernel stack overflow vulnerability from zero to advanced bypasses." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://mdanilor.github.io/posts/hevd-2/" />
+<meta property="article:published_time" content="2022-11-29T00:00:00-03:00" />
+<meta property="article:modified_time" content="2022-11-29T00:00:00-03:00" />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="[Cracking Windows Kernel with HEVD] Chapter 2: Is there a way to bypass kASLR, SMEP and KVA Shadow?"/>
+<meta name="twitter:description" content="A beginers guide into a Windows kernel stack overflow vulnerability from zero to advanced bypasses."/>
+
+	<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+	<link rel="manifest" href="/site.webmanifest">
+	<link rel="mask-icon" href="/safari-pinned-tab.svg" color="">
+	<link rel="shortcut icon" href="/favicon.ico">
+
+	<title>[Cracking Windows Kernel with HEVD] Chapter 2: Is there a way to bypass kASLR, SMEP and KVA Shadow?</title>
+	<link rel="stylesheet" href="https://mdanilor.github.io/css/style.min.eac77496566fd7d5768fd650ddb0b2b181ca6a2d7c5fdd6fe6b8ba4bf47e566f.css" integrity="sha256-6sd0llZv19V2j9ZQ3bCysYHKai18X91v5ri6S/R+Vm8=" crossorigin="anonymous">
+	
+</head>
+
+<body id="page">
+	
+	<header id="site-header" class="animated slideInUp">
+		<div class="hdr-wrapper section-inner">
+			<div class="hdr-left">
+				<div class="site-branding">
+					<a href="https://mdanilor.github.io">Cebola Security</a>
+				</div>
+				<nav class="site-nav hide-in-mobile">
+					
+				<a href="https://mdanilor.github.io/posts/">Posts</a>
+				<a href="https://mdanilor.github.io/about-hugo/">About</a>
+
+				</nav>
+			</div>
+			<div class="hdr-right hdr-icons">
+				<span class="hdr-social hide-in-mobile"><a href="https://github.com/mdanilor" target="_blank" rel="noopener me" title="Github"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg></a></span><button id="menu-btn" class="hdr-btn" title="Menu"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+			</div>
+		</div>
+	</header>
+	<div id="mobile-menu" class="animated fast">
+		<ul>
+			<li><a href="https://mdanilor.github.io/posts/">Posts</a></li>
+			<li><a href="https://mdanilor.github.io/about-hugo/">About</a></li>
+		</ul>
+	</div>
+
+
+	<main class="site-main section-inner animated fadeIn faster">
+		<article class="thin">
+			<header class="post-header">
+				<div class="post-meta"><span>Nov 29, 2022</span></div>
+				<h1>[Cracking Windows Kernel with HEVD] Chapter 2: Is there a way to bypass kASLR, SMEP and KVA Shadow?</h1>
+			</header>
+			<div class="content">
+				<p>##Cracking HackSys Extreme Vulnerable Driver: Is there a way to bypass kASLR, SMEP and KVA Shadow?</p>
+<h3 id="where-to-redirect-the-execution-flow">Where to redirect the execution flow?<a href="#where-to-redirect-the-execution-flow" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>On the <a href="/posts/hevd-1">previous post</a>, we wrote a program that would crash our driver and leave us with a BSOD. We managed to discover the return address offset and redirect the program flow to an arbitrary address. But we were left with a question: what now? Where to redirect the execution flow?</p>
+<p>The first naive approach that would come to mind is to create a userland function in our exploit and redirect the control flow to that function. This approach was fine until Windows 7 SP1 launched (I believe it was on Windows 7 SPI, but I might be mistaken on this one. Could not find sources on the Internet to back this up). However, from this point onwards Supervisor Mode Execution Prevention was enabled in processor which has support for it.</p>
+<h4 id="wtf-is-supervisor-mode-execition-prevention">WTF is Supervisor Mode Execition Prevention?<a href="#wtf-is-supervisor-mode-execition-prevention" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h4>
+<p>Ok, but first what is supervisor mode anyways?</p>
+<p><a href="https://en.wikipedia.org/wiki/Protection_ring#SUPERVISOR-MODE">Supervisor mode</a> is an execution mode which enables all instructions, including privileged ones. It gives access to different address spaces, memory management hardware and other peripherals. This is the mode in which the kernel, and its drivers, run. It is basically a &ldquo;god mode&rdquo; in which the kernel runs, but not userland programs.</p>
+<p>So the Supervisor Mode Execution Prevention is a mitigation that will not permit certain regions of memory (such as userland memory) to be executed in supervisor mode. In terms of our exploit, if we redirect the execution flow to our program in userland, it will raise a trap and you will immediately get a BSOD.</p>
+<p>This mitigation can be disabled (almost trivially on Windows, if I might say so) by setting the 20th bit of CR4 register to zero. This can be achieved in kernel land with a ROP chain. In this case, we can bypass SMEP by using a ROP chain, for instance.</p>
+<p>We can also bypass SMEP by never going to userland in the first place. We can use ROP gadgets in the kernel to perform elevation of privileges or write our shellcode to a memory region in the kernel which is both executable and writable. This approach is usually harder than the former.</p>
+<p>In this case, we should go with the easier approach and ROP our way to disable the SMEP bit on the CR4 register, right?</p>
+<p>Well, we could try. But nowadays there is another mitigation in place that will make this bypass useless.</p>
+<h4 id="smep-was-our-only-hope-no-there-is-another">SMEP was our only hope. No, there is another.<a href="#smep-was-our-only-hope-no-there-is-another" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h4>
+<p><img src="kernel2-img/14-yoda.webp" alt="">
+There is another mitigation called Kernel Page-Table Isolation (KPTI), or, as Windows calls it, Kernel Virtual Address (KVA) Shadow. It was actually created to mitigate Meltdown vulnerabilities by isolating kernel page tables from user page tables. However, it also creates another problem: when executing kernel code, it marks user page tables as non-executable (NX). This breaks down our easy approach to just disable SMEP by ropping.</p>
+<p>Now we can either mark user pages as executable again or use a writable and executable kernel page to store our shellcode. The latter approach will be used here.</p>
+<p>With this approach, we don&rsquo;t have to be concerned about SMEP at all, as we will just avoid it. But this raises yet another question: is there such a place in kernel where we can write our shellcode and execute it?</p>
+<h4 id="allocating-an-executable-pool">Allocating an executable pool<a href="#allocating-an-executable-pool" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h4>
+<p>Driver developers can allocate different types of memory pools. The two most basic types are PagedPool and NonPagedPool types. The former allocated a non-executable pageable memory pool for use, whereas the latter allocates non-pageable pool which, by default, is executable. The allocation can be performed by calling <a href="https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-exallocatepoolwithtag">ExAllocatePoolWithTag()</a> function with the desired parameters.</p>
+<p>We shall use this function to allocate an executable NonPagedPool. Then we write our shellcode to this allocated region and execute it. Finally, we restore enough registers so the system can return to userland gracefully and that&rsquo;s a wrap.</p>
+<p>The <code>ExAllocatePoolWithTag()</code> has the following prototype:</p>
+<pre><code>PVOID ExAllocatePoolWithTag(
+  [in] __drv_strictTypeMatch(__drv_typeExpr)POOL_TYPE PoolType,
+  [in] SIZE_T                                         NumberOfBytes,
+  [in] ULONG                                          Tag
+);
+</code></pre><p>The first parameter is the pool type, which is zero (NonPagedPool), as can be checked in the <a href="https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_pool_type">official Microsoft documentation</a>. The second parameter is the size, which we can just use 4096 bytes. Finally, the Tag parameter is just for debugging purposes. We can put whatever we want in it.</p>
+<p>It will return the address of the allocated pool.</p>
+<p>According to <a href="https://docs.microsoft.com/en-us/cpp/build/x64-calling-convention?view=msvc-170">Microsoft documentation</a>, the call convention dictates that the first parameter is given in <code>rcx</code> register, the second in <code>rdx</code> and the third in <code>r8</code>. We shall ROP our way to set up <code>rcx</code> to zero, <code>rdx</code> to 4096 and call this function. The address allocated will be returned in <code>rax</code> register, as it is also dictated by the call convention.</p>
+<p>After it is allocated, we can use <code>RtlCopyMemory</code> to copy our shellcode from userland to the executable address in the kernel land. Finally, we can use some gadget, such as <code>jmp rax</code> to redirect the execution flow.</p>
+<p>Once again, this approach raises another problem. We must have the address of <code>ExAllocatePoolWithTag</code> and <code>RtlCopyMemory</code> (or an analogue memory copy function) to know where to redirect our flow. We could get the address for these functions on the ntoskrnl.exe (which is actually the kernel program), but the imagebase is changed upon each reboot. This means that on every reboot, every kernel function will be added to an offset, the imagebase offset, making the addresses unpredictable. Our approach will rely on getting the addresses for the desired functions (and eventual gadgets) in the ntoskrnl.exe binary and somehow leak the imagebase address to defeat the protection.</p>
+<h4 id="defeating-the-randomized-imagebase">Defeating the randomized imagebase<a href="#defeating-the-randomized-imagebase" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h4>
+<p>This sounds like a really hard problem to solve that would rely on leaking a kernel address and then try to guess the imagebase with that. And this problem is usually hard to solve. But Windows makes it easier for us!</p>
+<p>For processes running with medium integrity level (which is the default level when you open applications), there are Windows APIs which will give that away for free. Microsoft even gives us <a href="https://docs.microsoft.com/en-us/windows/win32/psapi/enumerating-all-device-drivers-in-the-system">an example</a> of how to implement this.</p>
+<p>The <code>EnumDeviceDrivers</code> function, present on <code>psapi.h</code>, will enumerate all device drivers, including the kernel itself, and give us the base address for the device driver. It will return a list of device drivers, the first of which being the kernel itself. The implementation is very simple:</p>
+<pre><code>#include &lt;Windows.h&gt;
+#include &lt;Psapi.h&gt;
+...
+unsigned long long get_kernel_base_addr() {
+	LPVOID drivers[1024];
+	DWORD cbNeeded;
+
+	EnumDeviceDrivers(drivers, sizeof(drivers), &amp;cbNeeded);
+
+	return (unsigned long long)drivers[0];
+}
+
+</code></pre><p>There we go! The randomized imagebase is now defeated.</p>
+<p>It is also useful to be able to get any kernel function address by the function name. This is done by opening the kernel binary as a library and looking up the address for the desired symbol. The implementation is very straightforward as well:</p>
+<pre><code>PVOID get_kernel_symbol_addr(const char *symbol) {
+	PVOID kernelBaseAddr;
+	HMODULE userKernelHandle;
+	PCHAR functionAddress;
+	unsigned long long offset;
+
+	kernelBaseAddr = (PVOID)get_kernel_base_addr();  // Get base address from our previously implemented function
+	userKernelHandle = LoadLibraryA(&quot;C:\\Windows\\System32\\ntoskrnl.exe&quot;);  // Loads the kernel binary as a lib
+
+	if (userKernelHandle == INVALID_HANDLE_VALUE) {
+		// Something went wrong
+		return NULL;
+	}
+
+	functionAddress = (PCHAR)GetProcAddress(userKernelHandle, symbol);  // Finds the address of the specified symbol
+	if (functionAddress == NULL) {
+		// Something went wrong
+		return NULL;
+	}
+
+	offset = functionAddress - ((PCHAR)userKernelHandle);  // Subtracts the address found for the symbol to the base address of the lib loaded in the process memory
+	return (PVOID)(((PCHAR)kernelBaseAddr) + offset);  // Adds the offset of the leaked kernel base address
+}
+</code></pre><p>With the function above, we can query the address of any kernel function. Neat!</p>
+<p>I am afraid that is as far as we are going to get today, folks. On the next post we will craft our ROP payload. See you then!</p>
+
+			</div>
+			<hr class="post-end">
+			<footer class="post-info">
+				<p>
+					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-tag meta-icon"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7" y2="7"></line></svg><span class="tag"><a href="https://mdanilor.github.io/tags/windows">windows</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/kernel">kernel</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/exploit">exploit</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/stack">stack</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/overflow">overflow</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/hevd">hevd</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/hevd">HEVD</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/hacksys">hacksys</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/extreme">extreme</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/vulnerable">vulnerable</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/driver">driver</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/exploitation">exploitation</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/smep">smep</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/kpti">kpti</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/bypass">bypass</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/sysret">sysret</a></span>
+				</p>
+				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>1300 Words</p>
+				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-calendar"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>2022-11-29 00:00 -0300</p>
+			</footer>
+		</article>
+		<div class="post-nav thin">
+			<a class="prev-post" href="https://mdanilor.github.io/posts/hevd-1/">
+				<span class="post-nav-label">Older&nbsp;<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></span><br><span>[Cracking Windows Kernel with HEVD] Chapter 1: Will this driver ever crash?</span>
+			</a>
+		</div>
+		<div id="comments" class="thin">
+</div>
+	</main>
+
+	<footer id="site-footer" class="section-inner thin animated fadeIn faster">
+		<p>&copy; 2022 <a href="https://mdanilor.github.io">Danilo &#34;mdanilor&#34; Rodrigues</a> &#183; <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a></p>
+		<p>
+			Made with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> &#183; Theme <a href="https://github.com/Track3/hermit" target="_blank" rel="noopener">Hermit</a> &#183; <a href="https://mdanilor.github.io/posts/index.xml" target="_blank" title="rss"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-rss"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg></a>
+		</p>
+	</footer>
+
+
+
+	<script src="https://mdanilor.github.io/js/bundle.min.4a9a0ac3d2217822c7865b4161e6c2a71de1d70492264337755427898dd718f6.js" integrity="sha256-SpoKw9IheCLHhltBYebCpx3h1wSSJkM3dVQniY3XGPY=" crossorigin="anonymous"></script>
+	
+
+</body>
+
+</html>
