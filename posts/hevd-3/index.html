@@ -113,7 +113,7 @@ memcpy(); -&gt; Address of memcpy function to copy our shellcode to the executab
 This looks far from the payload we predicted. It&rsquo;s messy and big. This happened because it is hard to find gadgets that fit exactly to our needs. We often have to compromise and accept some collateral damage.</p>
 <p>There is one more catch. Check ExAllocatePoolWithTag&rsquo;s prologue:
 <img src="/posts/kernel2-img/16-allocate.png" alt=""></p>
-<p>As we can see, it uses <a href="https://retroscience.net/x64-assembly.html#fast-call-procedure-shadow-space-home-space">fast call procedure with shadow space</a>, AKA home space. In this convention, the caller must resere 32 bytes on stack for the callee. For ExAllocatePoolWithTag, only 24 bytes are needed. This means that after AllocatePoolWithTag we must make sure to add 0x18 to rsp. I found an <code>add rsp, 0x20</code> that will do just fine. I place it after AllocatePoolWithTag.</p>
+<p>As we can see, it uses <a href="https://retroscience.net/x64-assembly.html#fast-call-procedure-shadow-space-home-space">fast call procedure with shadow space</a>, AKA home space. In this convention, the caller must reserve 32 bytes on stack for the callee. For ExAllocatePoolWithTag, only 24 bytes are needed. This means that after AllocatePoolWithTag we must make sure to add 0x18 to rsp. I found an <code>add rsp, 0x20</code> that will do just fine. I place it after AllocatePoolWithTag.</p>
 <p>Here is what we have so far:</p>
 <pre><code>#include &lt;iostream&gt;
 #include &lt;string&gt;
