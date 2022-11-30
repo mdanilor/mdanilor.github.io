@@ -15,9 +15,8 @@
 			<pubDate>Tue, 29 Nov 2022 00:00:00 -0300</pubDate>
 			
 			<guid>https://mdanilor.github.io/posts/hevd-2/</guid>
-			<description>##Cracking HackSys Extreme Vulnerable Driver: Is there a way to bypass kASLR, SMEP and KVA Shadow?
-Where to redirect the execution flow? On the previous post, we wrote a program that would crash our driver and leave us with a BSOD. We managed to discover the return address offset and redirect the program flow to an arbitrary address. But we were left with a question: what now? Where to redirect the execution flow?</description>
-			<content type="html"><![CDATA[<p>##Cracking HackSys Extreme Vulnerable Driver: Is there a way to bypass kASLR, SMEP and KVA Shadow?</p>
+			<description>Cracking HackSys Extreme Vulnerable Driver: Is there a way to bypass kASLR, SMEP and KVA Shadow? Where to redirect the execution flow? On the previous post, we wrote a program that would crash our driver and leave us with a BSOD. We managed to discover the return address offset and redirect the program flow to an arbitrary address. But we were left with a question: what now? Where to redirect the execution flow?</description>
+			<content type="html"><![CDATA[<h2 id="cracking-hacksys-extreme-vulnerable-driver-is-there-a-way-to-bypass-kaslr-smep-and-kva-shadow">Cracking HackSys Extreme Vulnerable Driver: Is there a way to bypass kASLR, SMEP and KVA Shadow?</h2>
 <h3 id="where-to-redirect-the-execution-flow">Where to redirect the execution flow?</h3>
 <p>On the <a href="/posts/hevd-1">previous post</a>, we wrote a program that would crash our driver and leave us with a BSOD. We managed to discover the return address offset and redirect the program flow to an arbitrary address. But we were left with a question: what now? Where to redirect the execution flow?</p>
 <p>The first naive approach that would come to mind is to create a userland function in our exploit and redirect the control flow to that function. This approach was fine until Windows 7 SP1 launched (I believe it was on Windows 7 SPI, but I might be mistaken on this one. Could not find sources on the Internet to back this up). However, from this point onwards Supervisor Mode Execution Prevention was enabled in processor which has support for it.</p>
