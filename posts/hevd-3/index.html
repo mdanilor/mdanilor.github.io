@@ -90,7 +90,7 @@ jmp rcx; -&gt; jumps to a register which stores the address of our shellcode in 
 </code></pre><p>That sounds pretty complicated and will probably not work like that. We will most likely have to make a few adaptations. However, the plan is simple: allocate a writable and executable location in kernel land, copy our payload to it and then jump there. We need to find gadgets to do what we want. And for that, we shall use <a href="https://github.com/sashs/Ropper">ropper</a>. This tool will assist us in our ROP journey by helping us to find the gadgets.</p>
 <p>We may copy ntoskrnl.exe to a machine in which ropper is installed and then look for gadgets!</p>
 <p>Let&rsquo;s fire ropper up!</p>
-<p><img src="/posts/kernel2-img/15-ropper.jpg" alt=""></p>
+<p><img src="/posts/kernel2-img/15-ropper.png" alt=""></p>
 <p>And now&hellip;</p>
 <p><img src="/posts/kernel2-img/17-spongebob.jpg" alt=""></p>
 <p>This is what we have got:</p>
