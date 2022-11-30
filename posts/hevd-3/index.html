@@ -11,7 +11,7 @@
 <meta itemprop="description" content="A beginers guide into a Windows kernel stack overflow vulnerability.">
 <meta itemprop="datePublished" content="2022-11-30T13:08:50-03:00" />
 <meta itemprop="dateModified" content="2022-11-30T13:08:50-03:00" />
-<meta itemprop="wordCount" content="1663">
+<meta itemprop="wordCount" content="1669">
 
 
 
@@ -93,6 +93,7 @@ jmp rcx; -&gt; jumps to a register which stores the address of our shellcode in 
 <p><img src="/posts/kernel2-img/15-ropper.jpg" alt=""></p>
 <p>And now&hellip;</p>
 <p><img src="/posts/kernel2-img/17-spongebob.jpg" alt=""></p>
+<p>This is what we have got:</p>
 <pre><code>0x38cf53: xor ecx, ecx; mov rax, rcx; ret; -&gt; Zeroes out rcx register. Also zeroes out rax, but that is ok. Couldn't find a gadget that just turned rcx into 0.
 0x416748: pop rdx; ret; -&gt; pops 0x1000 (4096), just like we planned
 0x1000 -&gt; value of rdx and size of the buffer
@@ -334,7 +335,7 @@ int main(int argc, char **argv)
 				<p>
 					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-tag meta-icon"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7" y2="7"></line></svg><span class="tag"><a href="https://mdanilor.github.io/tags/windows">windows</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/kernel">kernel</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/exploit">exploit</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/stack">stack</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/overflow">overflow</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/hevd">hevd</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/hevd">HEVD</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/hacksys">hacksys</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/extreme">extreme</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/vulnerable">vulnerable</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/driver">driver</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/exploitation">exploitation</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/smep">smep</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/kpti">kpti</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/bypass">bypass</a></span>
 				</p>
-				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>1663 Words</p>
+				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>1669 Words</p>
 				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-calendar"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>2022-11-30 13:08 -0300</p>
 			</footer>
 		</article>

