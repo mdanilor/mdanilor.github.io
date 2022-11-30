@@ -21,21 +21,21 @@ Our ROP chain should look something like this:</description>
 <h4 id="when-are-we-building-the-payload-here">When are we building the payload here?</h4>
 <p>Patience! Thus far we have seen the basics to correctly assemble a usable payload. Now that we have all the tools necessary, let&rsquo;s finally create our payload. May the force be with us. If you missed the previous posts, make sure to check them out.</p>
 <p>Our ROP chain should look something like this:</p>
-<p><code>xor ecx, ecx; ret</code>: zeroes out our RCX register, which is the first parameter of AllocatePoolWithTag()</p>
-<p><code>pop rdx; ret</code>: pops 0x1000 (4096) to rdx register, which is the second parameter of AllocatePoolWithTag() and indicates the size of the pool</p>
-<p><code>0x1000</code>: value of rdx</p>
-<p><code>AllocatePoolWithTag()</code>: calls the AllocatePoolWithTag function. The address of the allocated pool will then be in rax</p>
-<p><code>mov rcx, rax; ret</code>: copies the address to rcx, which will be first parameter of memcpy</p>
-<p><code>pop rdx; ret</code>: gets the source address from stack. This will be our shellcode in userland that will escalate privileges.</p>
-<p><code>address of shellcode location in userland</code></p>
-<p><code>pop r8; ret</code>: gets the size from stack.</p>
-<p><code>size of our shellcode to be copied</code></p>
-<p><code>memcpy()</code>: calls the memcpy function and copies our payload to an executable kernel space</p>
-<p><code>jmp rcx</code>: jumps to a register which stores the address of our shellcode in kernel land</p>
-<p>That sounds pretty complicated and will probably not work like that. We will most likely have to make a few adaptations. However, the plan is simple: allocate a writable and executable location in kernel land, copy our payload to it and then jump there. We need to find gadgets to do what we want. And for that, we shall use <a href="https://github.com/sashs/Ropper">ropper</a>. This tool will assist us in our ROP journey by helping us to find the gadgets.</p>
+<pre><code>xor ecx, ecx; ret; -&gt; zeroes out our RCX register, which is the first parameter of AllocatePoolWithTag()
+pop rdx; ret ; -&gt; pops 0x1000 (4096) to rdx register, which is the second parameter of AllocatePoolWithTag() and indicates the size of the pool
+0x1000 -&gt; value of rdx
+AllocatePoolWithTag() -&gt; calls the AllocatePoolWithTag function. The address of the allocated pool will then be in rax
+mov rcx, rax; ret; -&gt; copies the address to rcx, which will be first parameter of memcpy
+pop rdx; ret -&gt; gets the source address from stack. This will be our shellcode in userland that will escalate privileges.
+&lt;address of shellcode location in userland&gt;
+pop r8; ret; -&gt; gets the size from stack.
+&lt;size of our shellcode to be copied&gt;
+memcpy() -&gt; calls the memcpy function and copies our payload to an executable kernel space
+jmp rcx; -&gt; jumps to a register which stores the address of our shellcode in kernel land
+</code></pre><p>That sounds pretty complicated and will probably not work like that. We will most likely have to make a few adaptations. However, the plan is simple: allocate a writable and executable location in kernel land, copy our payload to it and then jump there. We need to find gadgets to do what we want. And for that, we shall use <a href="https://github.com/sashs/Ropper">ropper</a>. This tool will assist us in our ROP journey by helping us to find the gadgets.</p>
 <p>We may copy ntoskrnl.exe to a machine in which ropper is installed and then look for gadgets!</p>
 <p>Let&rsquo;s fire ropper up!</p>
-<p><img src="/posts/kernel2-img/16-ropper.jpg" alt=""></p>
+<p><img src="/posts/kernel2-img/15-ropper.jpg" alt=""></p>
 <p>And now&hellip;</p>
 <p><img src="/posts/kernel2-img/17-spongebob.jpg" alt=""></p>
 <pre><code>0x38cf53: xor ecx, ecx; mov rax, rcx; ret; -&gt; Zeroes out rcx register. Also zeroes out rax, but that is ok. Couldn't find a gadget that just turned rcx into 0.
@@ -56,7 +56,7 @@ memcpy(); -&gt; Address of memcpy function to copy our shellcode to the executab
 </code></pre><p>What a mess!
 This looks far from the payload we predicted. It&rsquo;s messy and big. This happened because it is hard to find gadgets that fit exactly to our needs. We often have to compromise and accept some collateral damage.</p>
 <p>There is one more catch. Check ExAllocatePoolWithTag&rsquo;s prologue:
-<img src="kernel2-img/16-allocate.png" alt=""></p>
+<img src="/posts/kernel2-img/16-allocate.png" alt=""></p>
 <p>As we can see, it uses <a href="https://retroscience.net/x64-assembly.html#fast-call-procedure-shadow-space-home-space">fast call procedure with shadow space</a>, AKA home space. In this convention, the caller must resere 32 bytes on stack for the callee. For ExAllocatePoolWithTag, only 24 bytes are needed. This means that after AllocatePoolWithTag we must make sure to add 0x18 to rsp. I found an <code>add rsp, 0x20</code> that will do just fine. I place it after AllocatePoolWithTag.</p>
 <p>Here is what we have so far:</p>
 <pre><code>#include &lt;iostream&gt;
