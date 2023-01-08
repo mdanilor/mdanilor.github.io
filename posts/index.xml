@@ -934,7 +934,7 @@ Today we&amp;rsquo;ll be attacking HEVD: HackSys Extreme Vulnerable Driver. This
 <li><a href="/posts/hevd-1">Chapter 1: Will this driver ever crash?</a></li>
 <li><a href="/posts/hevd-2">Chapter 2: Is there a way to bypass kASLR, SMEP and KVA Shadow?</a></li>
 <li><a href="/posts/hevd-3">Chapter 3: Can we rop our way into triggering our shellcode?</a></li>
-<li>Chapter 4: How do we write a shellcode to elevate privileges and gracefully return to userland?</li>
+<li><a href="/posts/hevd-4">Chapter 4: How do we write a shellcode to elevate privileges and gracefully return to userland?</a></li>
 </ul>
 <p>Before we move on, I would like to thank a few friends, as I have not solved challenge by myself. Instead, it was an effort by me and my friends Viniboy, Giuliano and Psylinux through extensive Jitsi calls, a few frustration moments and a lot of joy at the end! Although we had some experience in Windows userland exploitation and Linux kernel exploitation, we did not know anything on Windows kernel exploitation. It has been quite a journey!</p>
 <p>Finally, I would also like to send my appreciation to <a href="https://sidi.org.br">SiDi</a>, my employer, for giving us the time and resources to study this topic.</p>
