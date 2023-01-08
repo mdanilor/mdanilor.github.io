@@ -625,7 +625,7 @@ int main(int argc, char **argv)
 <p>This exploit will trigger a stack based overflow that will execute our ROPChain in the stack. The ROPChain will allocate executable (and writable) space to allocate our shellcode and copy it to the allocated memory. Then, it will jump to this region of memory and execute our shellcode. The shellcode should contain instructions do elevate our <code>cmd</code> process&rsquo; privileges. Are you with me so far?</p>
 <p>The exploit should trigger a trap on WinDBG. Let us try:</p>
 <p><img src="/posts/kernel2-img/18-shellcodetriggered.png" alt=""></p>
-<p>I DO NOT BELIEVE THIS WORKED! The debugger has caught our trap. Now &ldquo;all&rdquo; we have to do is craft a shellcode that will elevate privileges and return gracefully (or with as much grace as possible) to userland. But this will be a topic for the next post! See you then!</p>
+<p>I DO NOT BELIEVE THIS WORKED! The debugger has caught our trap. Now &ldquo;all&rdquo; we have to do is craft a shellcode that will elevate privileges and return gracefully (or with as much grace as possible) to userland. But this will be a topic for the <a href="/posts/hevd-4/">next post</a>! See you then!</p>
 ]]></content>
 		</item>
 		
@@ -709,7 +709,7 @@ unsigned long long get_kernel_base_addr() {
 	return (PVOID)(((PCHAR)kernelBaseAddr) + offset);  // Adds the offset of the leaked kernel base address
 }
 </code></pre><p>With the function above, we can query the address of any kernel function. Neat!</p>
-<p>I am afraid that is as far as we are going to get today, folks. On the next post we will craft our ROP payload. See you then!</p>
+<p>I am afraid that is as far as we are going to get today, folks. On the <a href="/posts/hevd-3/">next post</a> we will craft our ROP payload. See you then!</p>
 ]]></content>
 		</item>
 		
@@ -910,7 +910,7 @@ int main()
 <p><img src="/posts/kernel2-img/12-patterninstack.png" alt=""></p>
 <p>In my case, I have <code>0Cr1</code> at the top of my stack. So I&rsquo;ll run <a href="https://github.com/ickerwx/pattern">pattern</a>: <code>pattern.py offset 0Cr1 2100</code>, where <code>0Cr1</code> is the pattern for which I want the offset and 2100 is the size of the generated buffer. And the result is 2072:</p>
 <p><img src="/posts/kernel2-img/13-patteroffset.png" alt=""></p>
-<p>That way, we must put the return address in the position 2072 of our payload. This will redirect the execution flow to whatever address we put in this position. But this raises the next question: where do we redirect the execution flow to? Unfortunately, this question will be answered on the next part! See you then!</p>
+<p>That way, we must put the return address in the position 2072 of our payload. This will redirect the execution flow to whatever address we put in this position. But this raises the next question: where do we redirect the execution flow to? Unfortunately, this question will be answered on the <a href="/posts/hevd-2/">next part</a>! See you then!</p>
 ]]></content>
 		</item>
 		

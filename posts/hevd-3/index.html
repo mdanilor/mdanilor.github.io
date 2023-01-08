@@ -327,7 +327,7 @@ int main(int argc, char **argv)
 <p>This exploit will trigger a stack based overflow that will execute our ROPChain in the stack. The ROPChain will allocate executable (and writable) space to allocate our shellcode and copy it to the allocated memory. Then, it will jump to this region of memory and execute our shellcode. The shellcode should contain instructions do elevate our <code>cmd</code> process&rsquo; privileges. Are you with me so far?</p>
 <p>The exploit should trigger a trap on WinDBG. Let us try:</p>
 <p><img src="/posts/kernel2-img/18-shellcodetriggered.png" alt=""></p>
-<p>I DO NOT BELIEVE THIS WORKED! The debugger has caught our trap. Now &ldquo;all&rdquo; we have to do is craft a shellcode that will elevate privileges and return gracefully (or with as much grace as possible) to userland. But this will be a topic for the next post! See you then!</p>
+<p>I DO NOT BELIEVE THIS WORKED! The debugger has caught our trap. Now &ldquo;all&rdquo; we have to do is craft a shellcode that will elevate privileges and return gracefully (or with as much grace as possible) to userland. But this will be a topic for the <a href="/posts/hevd-4/">next post</a>! See you then!</p>
 
 			</div>
 			<hr class="post-end">

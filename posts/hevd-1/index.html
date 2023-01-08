@@ -261,7 +261,7 @@ int main()
 <p><img src="/posts/kernel2-img/12-patterninstack.png" alt=""></p>
 <p>In my case, I have <code>0Cr1</code> at the top of my stack. So I&rsquo;ll run <a href="https://github.com/ickerwx/pattern">pattern</a>: <code>pattern.py offset 0Cr1 2100</code>, where <code>0Cr1</code> is the pattern for which I want the offset and 2100 is the size of the generated buffer. And the result is 2072:</p>
 <p><img src="/posts/kernel2-img/13-patteroffset.png" alt=""></p>
-<p>That way, we must put the return address in the position 2072 of our payload. This will redirect the execution flow to whatever address we put in this position. But this raises the next question: where do we redirect the execution flow to? Unfortunately, this question will be answered on the next part! See you then!</p>
+<p>That way, we must put the return address in the position 2072 of our payload. This will redirect the execution flow to whatever address we put in this position. But this raises the next question: where do we redirect the execution flow to? Unfortunately, this question will be answered on the <a href="/posts/hevd-2/">next part</a>! See you then!</p>
 
 			</div>
 			<hr class="post-end">
