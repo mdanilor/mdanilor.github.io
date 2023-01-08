@@ -7,10 +7,20 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.</copyright>
-    <lastBuildDate>Wed, 30 Nov 2022 13:08:50 -0300</lastBuildDate>
+    <lastBuildDate>Sun, 08 Jan 2023 10:08:50 -0300</lastBuildDate>
     
 	<atom:link href="https://mdanilor.github.io/tags/overflow/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>[Cracking Windows Kernel with HEVD] Chapter 4: How do we write a shellcode to elevate privileges and gracefully return to userland?</title>
+      <link>https://mdanilor.github.io/posts/hevd-4/</link>
+      <pubDate>Sun, 08 Jan 2023 10:08:50 -0300</pubDate>
+      
+      <guid>https://mdanilor.github.io/posts/hevd-4/</guid>
+      <description>The end is near Throughout the previous four chapters, everything we have been doing was basically exploiting a stack-based buffer overflow and bypassing a few kernel mitigations. Apart from the kernel-specific memory mitigations, until this point the exploitation has been as vanilla as it gets: a stack overflow with no canary.
+In this final post, we will dive into Windows privilege mechanism and use it to elevate our privileges. Then, we must return to userland.</description>
+    </item>
     
     <item>
       <title>[Cracking Windows Kernel with HEVD] Chapter 3: Can we rop our way into triggering our shellcode?</title>
